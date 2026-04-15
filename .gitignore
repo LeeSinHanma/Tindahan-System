@@ -1,0 +1,61 @@
+# -----------------------------
+# Python virtual environments
+# -----------------------------
+env/
+venv/
+.venv/
+ENV/
+
+# -----------------------------
+# Python bytecode / cache
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# -----------------------------
+# Tool caches / test artifacts
+# -----------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# -----------------------------
+# Packaging / build outputs
+# -----------------------------
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# -----------------------------
+# Logs
+# -----------------------------
+*.log
+
+# -----------------------------
+# Editor / IDE files
+# -----------------------------
+.vscode/
+.idea/
+*.code-workspace
+
+# -----------------------------
+# OS files
+# -----------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# -----------------------------
+# Local SQLite database files
+# -----------------------------
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
