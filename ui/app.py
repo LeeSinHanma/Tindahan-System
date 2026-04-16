@@ -13,10 +13,8 @@ class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Tindahan POS + Inventory")
-        self.root.geometry("1280x760")
-        self.root.minsize(1100, 680)
         self._configure_global_typography()
-        self._set_default_fullscreen()
+        self._configure_window_geometry()
 
         self.active_screen: str = "dashboard"
         self.nav_buttons: dict[str, tk.Button] = {}
@@ -53,11 +51,16 @@ class App:
         style.configure("Treeview", font=("Segoe UI", 11), rowheight=30)
         style.configure("Treeview.Heading", font=("Segoe UI", 11, "bold"))
 
-    def _set_default_fullscreen(self) -> None:
+    def _configure_window_geometry(self) -> None:
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+
+        self.root.minsize(min(1024, screen_w), min(640, screen_h))
+
         try:
             self.root.state("zoomed")
         except tk.TclError:
-            self.root.attributes("-fullscreen", True)
+            self.root.geometry(f"{screen_w}x{screen_h}+0+0")
 
     def _toggle_fullscreen(self, _event: tk.Event | None = None) -> None:
         try:

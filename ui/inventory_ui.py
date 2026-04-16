@@ -103,8 +103,18 @@ class InventoryFrame(ttk.Frame):
         modal.geometry(f"{width}x{height}")
         modal.resizable(False, False)
         modal.transient(self.winfo_toplevel())
-        modal.grab_set()
+        modal.update_idletasks()
+        modal.lift()
+        modal.focus_force()
+        try:
+            modal.attributes("-topmost", True)
+            modal.after_idle(lambda: modal.attributes("-topmost", False))
+        except tk.TclError:
+            pass
         self._center_modal(modal, width, height)
+        modal.lift()
+        modal.wait_visibility()
+        modal.grab_set()
         return modal
 
     def _center_modal(self, modal: tk.Toplevel, width: int, height: int) -> None:

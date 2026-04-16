@@ -136,8 +136,18 @@ class UntrackedFrame(ttk.Frame):
         modal.title("Enable Stock Tracking")
         modal.resizable(False, False)
         modal.transient(self.winfo_toplevel())
-        modal.grab_set()
+        modal.update_idletasks()
+        modal.lift()
+        modal.focus_force()
+        try:
+            modal.attributes("-topmost", True)
+            modal.after_idle(lambda: modal.attributes("-topmost", False))
+        except tk.TclError:
+            pass
         self._center_modal(modal, 480, 320)
+        modal.lift()
+        modal.wait_visibility()
+        modal.grab_set()
 
         content = ttk.Frame(modal, padding=16)
         content.pack(fill=tk.BOTH, expand=True)
