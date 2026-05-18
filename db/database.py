@@ -99,6 +99,64 @@ def init_database() -> None:
         )
         _ensure_column(conn, "shopping_list_items", "purchased_at", "TEXT")
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS debt_tracker (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                person_name TEXT NOT NULL,
+                amount REAL NOT NULL,
+                is_paid INTEGER NOT NULL DEFAULT 0,
+                description TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                paid_at TEXT
+            )
+            """
+        )
+
+        _ensure_column(conn, "debt_tracker", "description", "TEXT DEFAULT ''")
+
+        # Customers table to support account-style debt tracking
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS customers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                is_admin INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        )
+
+        # ensure default admin user exists (hardcoded credentials)
+        conn.execute(
+            "INSERT OR IGNORE INTO users (username, password, is_admin) VALUES (?, ?, ?)",
+            ("admin", "KennyDLuffy213", 1),
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                username TEXT,
+                action TEXT NOT NULL,
+                details TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        )
+
         _ensure_column(conn, "products", "description", "TEXT NOT NULL DEFAULT ''")
         _ensure_column(conn, "products", "original_price", "REAL NOT NULL DEFAULT 0")
         _ensure_column(conn, "products", "sell_price", "REAL NOT NULL DEFAULT 0")
@@ -147,6 +205,15 @@ def init_database() -> None:
             ("low_stock_threshold", "10"),
         )
 
+        conn.commit()
+
+
+def record_user_audit(username: str | None, user_id: int | None, action: str, details: str | None = None) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO user_audit (user_id, username, action, details) VALUES (?, ?, ?, ?)",
+            (user_id, username, action, details),
+        )
         conn.commit()
 
 
@@ -313,6 +380,19 @@ def update_product(product_id: int, product_data: dict) -> None:
 
 def delete_product(product_id: int) -> None:
     with get_connection() as conn:
+        usage_count = conn.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM sale_items WHERE product_id = ?) +
+                (SELECT COUNT(*) FROM shopping_list_items WHERE product_id = ?)
+            AS usage_count
+            """,
+            (product_id, product_id),
+        ).fetchone()["usage_count"]
+
+        if usage_count:
+            raise ValueError("Cannot delete a product that is used in a sale or shopping list.")
+
         conn.execute("DELETE FROM products WHERE id = ?", (product_id,))
         conn.commit()
 

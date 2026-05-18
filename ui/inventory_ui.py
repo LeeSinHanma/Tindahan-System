@@ -7,6 +7,10 @@ from core import inventory
 class InventoryFrame(ttk.Frame):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master, padding=14)
+        top_level = master.winfo_toplevel()
+        screen_w = top_level.winfo_screenwidth()
+        screen_h = top_level.winfo_screenheight()
+        self.compact_layout = screen_w < 1400 or screen_h < 820
         self.selected_product_id: int | None = None
         self.search_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Select a product, then use Create / Update / Delete")
@@ -20,11 +24,13 @@ class InventoryFrame(ttk.Frame):
         header = ttk.Frame(self)
         header.pack(fill=tk.X)
 
-        ttk.Label(header, text="Inventory CRUD", font=("Segoe UI", 24, "bold")).pack(anchor="w")
+        title_size = 20 if self.compact_layout else 24
+        subhead_size = 11 if self.compact_layout else 13
+        ttk.Label(header, text="Inventory CRUD", font=("Segoe UI", title_size, "bold")).pack(anchor="w")
         ttk.Label(
             header,
             text="Create products from a modal form, update stock with buttons, or delete with confirmation.",
-            font=("Segoe UI", 13),
+            font=("Segoe UI", subhead_size),
         ).pack(anchor="w", pady=(4, 0))
 
         toolbar = ttk.Frame(self)
@@ -59,13 +65,13 @@ class InventoryFrame(ttk.Frame):
         self.product_table.heading("stock", text="Stock")
         self.product_table.heading("tracked", text="Tracked")
 
-        self.product_table.column("id", width=60, anchor=tk.CENTER)
-        self.product_table.column("name", width=280)
-        self.product_table.column("barcode", width=180)
-        self.product_table.column("original_price", width=120, anchor=tk.E)
-        self.product_table.column("sell_price", width=120, anchor=tk.E)
-        self.product_table.column("stock", width=90, anchor=tk.CENTER)
-        self.product_table.column("tracked", width=90, anchor=tk.CENTER)
+        self.product_table.column("id", width=45, anchor=tk.CENTER)
+        self.product_table.column("name", width=160, anchor=tk.W)
+        self.product_table.column("barcode", width=100, anchor=tk.W)
+        self.product_table.column("original_price", width=75, anchor=tk.E)
+        self.product_table.column("sell_price", width=75, anchor=tk.E)
+        self.product_table.column("stock", width=60, anchor=tk.CENTER)
+        self.product_table.column("tracked", width=60, anchor=tk.CENTER)
         self.product_table.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
 
         scrollbar = ttk.Scrollbar(table_box, orient=tk.VERTICAL, command=self.product_table.yview)
@@ -82,6 +88,9 @@ class InventoryFrame(ttk.Frame):
         ttk.Label(footer, textvariable=self.status_var).pack(side=tk.LEFT)
 
     def _create_toolbar_button(self, parent: tk.Widget, text: str, command, color: str) -> tk.Button:
+        btn_padx = 12 if self.compact_layout else 16
+        btn_pady = 6 if self.compact_layout else 8
+        btn_font_size = 11 if self.compact_layout else 13
         return tk.Button(
             parent,
             text=text,
@@ -91,9 +100,9 @@ class InventoryFrame(ttk.Frame):
             activebackground=color,
             activeforeground="white",
             relief=tk.FLAT,
-            padx=16,
-            pady=8,
-            font=("Segoe UI", 13, "bold"),
+            padx=btn_padx,
+            pady=btn_pady,
+            font=("Segoe UI", btn_font_size, "bold"),
             cursor="hand2",
         )
 
@@ -393,7 +402,12 @@ class InventoryFrame(ttk.Frame):
             ):
                 return
 
-            inventory.delete_product(product["id"])
+            try:
+                inventory.delete_product(product["id"])
+            except ValueError as exc:
+                messagebox.showerror("Cannot delete product", str(exc), parent=modal)
+                return
+
             modal.destroy()
             self.selected_product_id = None
             self.refresh_products(self.search_var.get())

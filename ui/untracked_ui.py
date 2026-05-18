@@ -7,6 +7,10 @@ from core import inventory
 class UntrackedFrame(ttk.Frame):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master, padding=14)
+        top_level = master.winfo_toplevel()
+        screen_w = top_level.winfo_screenwidth()
+        screen_h = top_level.winfo_screenheight()
+        self.compact_layout = screen_w < 1400 or screen_h < 820
         self.selected_product_id: int | None = None
         self.search_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Products without stock tracking are listed here.")
@@ -18,11 +22,13 @@ class UntrackedFrame(ttk.Frame):
         header = ttk.Frame(self)
         header.pack(fill=tk.X)
 
-        ttk.Label(header, text="Untracked Items", font=("Segoe UI", 24, "bold")).pack(anchor="w")
+        title_size = 20 if self.compact_layout else 24
+        subhead_size = 11 if self.compact_layout else 13
+        ttk.Label(header, text="Untracked Items", font=("Segoe UI", title_size, "bold")).pack(anchor="w")
         ttk.Label(
             header,
             text="These products can be sold without stock counting. Enable tracking later if needed.",
-            font=("Segoe UI", 13),
+            font=("Segoe UI", subhead_size),
         ).pack(anchor="w", pady=(4, 0))
 
         toolbar = ttk.Frame(self)
@@ -45,9 +51,9 @@ class UntrackedFrame(ttk.Frame):
             activebackground="#1d4ed8",
             activeforeground="white",
             relief=tk.FLAT,
-            padx=16,
-            pady=8,
-            font=("Segoe UI", 13, "bold"),
+            padx=12 if self.compact_layout else 16,
+            pady=6 if self.compact_layout else 8,
+            font=("Segoe UI", 11 if self.compact_layout else 13, "bold"),
             cursor="hand2",
         ).pack(side=tk.LEFT, padx=(0, 8))
         tk.Button(
@@ -59,9 +65,9 @@ class UntrackedFrame(ttk.Frame):
             activebackground="#64748b",
             activeforeground="white",
             relief=tk.FLAT,
-            padx=16,
-            pady=8,
-            font=("Segoe UI", 13, "bold"),
+            padx=12 if self.compact_layout else 16,
+            pady=6 if self.compact_layout else 8,
+            font=("Segoe UI", 11 if self.compact_layout else 13, "bold"),
             cursor="hand2",
         ).pack(side=tk.LEFT, padx=(0, 8))
         tk.Button(
@@ -73,9 +79,9 @@ class UntrackedFrame(ttk.Frame):
             activebackground="#4f46e5",
             activeforeground="white",
             relief=tk.FLAT,
-            padx=16,
-            pady=8,
-            font=("Segoe UI", 13, "bold"),
+            padx=12 if self.compact_layout else 16,
+            pady=6 if self.compact_layout else 8,
+            font=("Segoe UI", 11 if self.compact_layout else 13, "bold"),
             cursor="hand2",
         ).pack(side=tk.RIGHT)
 
@@ -90,11 +96,11 @@ class UntrackedFrame(ttk.Frame):
         self.product_table.heading("sell_price", text="Sell Price")
         self.product_table.heading("stock", text="Stock")
 
-        self.product_table.column("id", width=60, anchor=tk.CENTER)
-        self.product_table.column("name", width=300)
-        self.product_table.column("barcode", width=180)
-        self.product_table.column("sell_price", width=120, anchor=tk.E)
-        self.product_table.column("stock", width=90, anchor=tk.CENTER)
+        self.product_table.column("id", width=45, anchor=tk.CENTER)
+        self.product_table.column("name", width=200)
+        self.product_table.column("barcode", width=120)
+        self.product_table.column("sell_price", width=85, anchor=tk.E)
+        self.product_table.column("stock", width=60, anchor=tk.CENTER)
         self.product_table.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
 
         scrollbar = ttk.Scrollbar(table_box, orient=tk.VERTICAL, command=self.product_table.yview)
