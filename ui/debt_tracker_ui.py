@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from core import debt_tracker
+from .theme_manager import ThemeManager
 
 
 class DebtTrackerFrame(ttk.Frame):
@@ -11,6 +12,7 @@ class DebtTrackerFrame(ttk.Frame):
         screen_w = top_level.winfo_screenwidth()
         screen_h = top_level.winfo_screenheight()
         self.compact_layout = screen_w < 1400 or screen_h < 820
+        self.theme = ThemeManager(self.compact_layout)
         self.selected_customer: str | None = None
         self.selected_debt_id: int | None = None
         self.person_var = tk.StringVar()
@@ -26,17 +28,15 @@ class DebtTrackerFrame(ttk.Frame):
         header = ttk.Frame(self)
         header.pack(fill=tk.X)
 
-        title_size = 20 if self.compact_layout else 24
-        subhead_size = 11 if self.compact_layout else 13
-        ttk.Label(header, text="Debt Tracker", font=("Segoe UI", title_size, "bold")).pack(anchor="w")
+        ttk.Label(header, text="Debt Tracker", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
         ttk.Label(
             header,
             text="View customer accounts and manage individual debts.",
-            font=("Segoe UI", subhead_size),
+            font=("Segoe UI", self.theme.body_medium),
         ).pack(anchor="w", pady=(4, 0))
 
         # Customers section
-        customers_label = ttk.Label(header, text="Customers", font=("Segoe UI", 13 if self.compact_layout else 14, "bold"))
+        customers_label = ttk.Label(header, text="Customers", font=("Segoe UI", self.theme.body_medium, "bold"))
         customers_label.pack(anchor="w", pady=(12, 8))
 
         customers_frame = ttk.Frame(self)
@@ -50,14 +50,14 @@ class DebtTrackerFrame(ttk.Frame):
         left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
         left_panel.rowconfigure(1, weight=1)
 
-        ttk.Label(left_panel, text="Customer Accounts", font=("Segoe UI", 11 if self.compact_layout else 12, "bold")).pack(anchor="w", pady=(0, 6))
+        ttk.Label(left_panel, text="Customer Accounts", font=("Segoe UI", self.theme.body_medium, "bold")).pack(anchor="w", pady=(0, 6))
 
         # New customer form
         new_cust_row = ttk.Frame(left_panel)
         new_cust_row.pack(fill=tk.X, pady=(0, 6))
         new_cust_entry = ttk.Entry(new_cust_row, textvariable=self.new_customer_var)
         new_cust_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self._create_button(new_cust_row, "New Customer", self._add_customer, "#4f46e5", 8, 4, 10).pack(side=tk.LEFT, padx=(6, 0))
+        self._create_button(new_cust_row, "New Customer", self._add_customer, "#4f46e5", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).pack(side=tk.LEFT, padx=(6, 0))
 
         customer_table_frame = ttk.Frame(left_panel)
         customer_table_frame.pack(fill=tk.BOTH, expand=True)
@@ -68,7 +68,7 @@ class DebtTrackerFrame(ttk.Frame):
         self.customer_table.heading("total", text="Total Debt")
         self.customer_table.heading("pending", text="Items")
 
-        self.customer_table.column("customer", width=150 if self.compact_layout else 180)
+        self.customer_table.column("customer", width=self.theme.table_column_width_name)
         self.customer_table.column("total", width=100, anchor=tk.E)
         self.customer_table.column("pending", width=70, anchor=tk.CENTER)
         self.customer_table.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
@@ -87,30 +87,26 @@ class DebtTrackerFrame(ttk.Frame):
         info_frame = ttk.Frame(right_panel)
         info_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
 
-        ttk.Label(info_frame, text="Customer:", font=("Segoe UI", 10 if self.compact_layout else 11, "bold")).pack(side=tk.LEFT)
-        ttk.Label(info_frame, textvariable=self.person_var, font=("Segoe UI", 10 if self.compact_layout else 11)).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Label(info_frame, text="Customer:", font=("Segoe UI", self.theme.body_small, "bold")).pack(side=tk.LEFT)
+        ttk.Label(info_frame, textvariable=self.person_var, font=("Segoe UI", self.theme.body_small)).pack(side=tk.LEFT, padx=(8, 0))
 
         # Add debt form
         form_frame = ttk.LabelFrame(right_panel, text="Add New Debt", padding=8)
         form_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         form_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(form_frame, text="Amount:", font=("Segoe UI", 10 if self.compact_layout else 11, "bold")).grid(row=0, column=0, sticky="w")
-        amount_entry = ttk.Entry(form_frame, textvariable=self.amount_var, font=("Segoe UI", 10 if self.compact_layout else 11))
+        ttk.Label(form_frame, text="Amount:", font=("Segoe UI", self.theme.body_small, "bold")).grid(row=0, column=0, sticky="w")
+        amount_entry = ttk.Entry(form_frame, textvariable=self.amount_var, font=("Segoe UI", self.theme.body_small))
         amount_entry.grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
-        ttk.Label(form_frame, text="Description:", font=("Segoe UI", 10 if self.compact_layout else 11, "bold")).grid(row=1, column=0, sticky="w", pady=(6, 0))
-        desc_entry = ttk.Entry(form_frame, textvariable=self.description_var, font=("Segoe UI", 10 if self.compact_layout else 11))
+        ttk.Label(form_frame, text="Description:", font=("Segoe UI", self.theme.body_small, "bold")).grid(row=1, column=0, sticky="w", pady=(6, 0))
+        desc_entry = ttk.Entry(form_frame, textvariable=self.description_var, font=("Segoe UI", self.theme.body_small))
         desc_entry.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(6, 0))
 
-        btn_padx = 10 if self.compact_layout else 12
-        btn_pady = 4 if self.compact_layout else 6
-        btn_font_size = 10 if self.compact_layout else 11
-
-        self._create_button(form_frame, "Add Debt", self._add_debt_to_customer, "#16a34a", btn_padx, btn_pady, btn_font_size).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        self._create_button(form_frame, "Add Debt", self._add_debt_to_customer, "#16a34a", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
 
         # Debts list for selected customer
-        debts_label = ttk.Label(right_panel, text="Debts", font=("Segoe UI", 11 if self.compact_layout else 12, "bold"))
+        debts_label = ttk.Label(right_panel, text="Debts", font=("Segoe UI", self.theme.body_medium, "bold"))
         debts_label.grid(row=2, column=0, sticky="w", pady=(8, 6))
 
         debts_table_frame = ttk.Frame(right_panel)
@@ -143,14 +139,14 @@ class DebtTrackerFrame(ttk.Frame):
         action_frame = ttk.Frame(right_panel)
         action_frame.grid(row=4, column=0, sticky="ew", pady=(8, 0))
 
-        self._create_button(action_frame, "Mark Paid", self._mark_debt_paid, "#0ea5e9", btn_padx, btn_pady, btn_font_size).pack(side=tk.LEFT)
-        self._create_button(action_frame, "Delete", self._delete_debt, "#dc2626", btn_padx, btn_pady, btn_font_size).pack(side=tk.LEFT, padx=(6, 0))
+        self._create_button(action_frame, "Mark Paid", self._mark_debt_paid, "#0ea5e9", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).pack(side=tk.LEFT)
+        self._create_button(action_frame, "Delete", self._delete_debt, "#dc2626", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).pack(side=tk.LEFT, padx=(6, 0))
         # Pay by amount controls
         pay_frame = ttk.Frame(right_panel)
         pay_frame.grid(row=5, column=0, sticky="ew", pady=(8, 0))
         pay_frame.columnconfigure(0, weight=1)
         self.pay_amount_var = tk.StringVar()
-        ttk.Label(pay_frame, text="Pay Amount:", font=("Segoe UI", 10 if self.compact_layout else 11, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(pay_frame, text="Pay Amount:", font=("Segoe UI", self.theme.body_small, "bold")).grid(row=0, column=0, sticky="w")
         pay_entry = ttk.Entry(pay_frame, textvariable=self.pay_amount_var)
         pay_entry.grid(row=0, column=1, sticky="ew", padx=(8, 0))
         self.pay_button = tk.Button(
@@ -160,8 +156,8 @@ class DebtTrackerFrame(ttk.Frame):
             bg="#059669",
             fg="white",
             relief=tk.FLAT,
-            padx=10,
-            pady=6,
+            padx=self.theme.button_padding_x,
+            pady=self.theme.button_padding_y,
         )
         self.pay_button.grid(row=0, column=2, padx=(8, 0))
         pay_entry.bind("<KeyRelease>", lambda _event: self._update_pay_button_state())

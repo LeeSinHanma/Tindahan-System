@@ -4,6 +4,7 @@ from tkinter import ttk
 
 from core import inventory
 from db import database
+from .theme_manager import ThemeManager
 
 
 class DashboardFrame(ttk.Frame):
@@ -16,6 +17,7 @@ class DashboardFrame(ttk.Frame):
         screen_w = top_level.winfo_screenwidth()
         screen_h = top_level.winfo_screenheight()
         self.compact_layout = screen_w < 1400 or screen_h < 820
+        self.theme = ThemeManager(self.compact_layout)
 
         self._configure_styles()
         self._build_ui()
@@ -23,22 +25,16 @@ class DashboardFrame(ttk.Frame):
 
     def _configure_styles(self) -> None:
         style = ttk.Style(self)
-        title_size = 20 if self.compact_layout else 22
-        subhead_size = 10 if self.compact_layout else 11
-        card_value_size = 18 if self.compact_layout else 20
-        quick_button_size = 10 if self.compact_layout else 11
-        rowheight = 24 if self.compact_layout else 28
-
-        style.configure("DashboardTitle.TLabel", font=("Segoe UI", title_size, "bold"))
-        style.configure("DashboardSubhead.TLabel", font=("Segoe UI", subhead_size))
-        style.configure("DashboardCardValue.TLabel", font=("Segoe UI", card_value_size, "bold"))
-        style.configure("DashboardQuick.TButton", font=("Segoe UI", quick_button_size, "bold"))
-        style.configure("Treeview", rowheight=rowheight)
-        style.configure("Treeview.Heading", font=("Segoe UI", 10 if self.compact_layout else 11, "bold"))
+        style.configure("DashboardTitle.TLabel", font=("Segoe UI", self.theme.heading_huge, "bold"))
+        style.configure("DashboardSubhead.TLabel", font=("Segoe UI", self.theme.body_medium))
+        style.configure("DashboardCardValue.TLabel", font=("Segoe UI", self.theme.heading_huge, "bold"))
+        style.configure("DashboardQuick.TButton", font=("Segoe UI", self.theme.body_medium, "bold"))
+        style.configure("Treeview", rowheight=self.theme.table_row_height)
+        style.configure("Treeview.Heading", font=("Segoe UI", self.theme.body_medium, "bold"))
 
     def _build_ui(self) -> None:
         header = ttk.Frame(self)
-        header.pack(fill=tk.X, pady=(0, 6 if self.compact_layout else 10))
+        header.pack(fill=tk.X, pady=(0, self.theme.gap_large))
 
         ttk.Label(header, text="Dashboard", style="DashboardTitle.TLabel").pack(anchor="w")
         ttk.Label(
@@ -48,7 +44,7 @@ class DashboardFrame(ttk.Frame):
         ).pack(anchor="w", pady=(4, 0))
 
         controls = ttk.Frame(self)
-        controls.pack(fill=tk.X, pady=(0, 8 if self.compact_layout else 12))
+        controls.pack(fill=tk.X, pady=(0, self.theme.gap_large))
 
         filters = ttk.Frame(controls)
         filters.pack(side=tk.LEFT)
@@ -81,7 +77,7 @@ class DashboardFrame(ttk.Frame):
         ttk.Button(quick_actions, text="Refresh", style="DashboardQuick.TButton", command=self.refresh).pack(side=tk.LEFT, padx=(8, 0))
 
         self.cards = ttk.Frame(self)
-        self.cards.pack(fill=tk.X, pady=(0, 4 if self.compact_layout else 0))
+        self.cards.pack(fill=tk.X, pady=(0, self.theme.gap_small))
 
         self._card_frames: dict[str, ttk.Label] = {}
         card_specs = [
@@ -94,7 +90,7 @@ class DashboardFrame(ttk.Frame):
         ]
 
         for index, (title, key) in enumerate(card_specs):
-            card = ttk.LabelFrame(self.cards, padding=6 if self.compact_layout else 10, text=title)
+            card = ttk.LabelFrame(self.cards, padding=self.theme.padding_medium, text=title)
             card.grid(row=0, column=index, sticky="nsew", padx=(0 if index == 0 else 8, 0))
             self.cards.columnconfigure(index, weight=1)
             value = ttk.Label(card, text="0", style="DashboardCardValue.TLabel")
@@ -102,7 +98,7 @@ class DashboardFrame(ttk.Frame):
             self._card_frames[key] = value
 
         status_row = ttk.Frame(self)
-        status_row.pack(fill=tk.X, pady=(6 if self.compact_layout else 10, 0))
+        status_row.pack(fill=tk.X, pady=(self.theme.gap_medium, 0))
         status_row.columnconfigure(0, weight=1)
         status_row.columnconfigure(1, weight=1)
 
@@ -135,19 +131,19 @@ class DashboardFrame(ttk.Frame):
         self.sales_label.pack(fill=tk.X)
 
         content = ttk.Frame(self)
-        content.pack(fill=tk.BOTH, expand=True, pady=(8 if self.compact_layout else 12, 0))
+        content.pack(fill=tk.BOTH, expand=True, pady=(self.theme.gap_large, 0))
         content.columnconfigure(0, weight=2)
         content.columnconfigure(1, weight=1)
         content.rowconfigure(0, weight=2)
         content.rowconfigure(1, weight=1)
 
-        inner_padding = 6 if self.compact_layout else 10
-        gap = 6 if self.compact_layout else 8
+        inner_padding = self.theme.padding_medium
+        gap = self.theme.gap_medium
 
         left_top = ttk.LabelFrame(content, text="Recent Sales", padding=inner_padding)
         left_top.grid(row=0, column=0, sticky="nsew", padx=(0, gap))
 
-        self.sales_table = ttk.Treeview(left_top, columns=("id", "date", "time", "total"), show="headings", height=6 if self.compact_layout else 10)
+        self.sales_table = ttk.Treeview(left_top, columns=("id", "date", "time", "total"), show="headings", height=self.theme.table_height_medium)
         self.sales_table.heading("id", text="ID")
         self.sales_table.heading("date", text="Date")
         self.sales_table.heading("time", text="Time")
@@ -161,7 +157,7 @@ class DashboardFrame(ttk.Frame):
         right_top = ttk.LabelFrame(content, text="Top Selling Products", padding=inner_padding)
         right_top.grid(row=0, column=1, sticky="nsew")
 
-        self.top_table = ttk.Treeview(right_top, columns=("name", "qty", "revenue"), show="headings", height=6 if self.compact_layout else 10)
+        self.top_table = ttk.Treeview(right_top, columns=("name", "qty", "revenue"), show="headings", height=self.theme.table_height_medium)
         self.top_table.heading("name", text="Product")
         self.top_table.heading("qty", text="Qty")
         self.top_table.heading("revenue", text="Revenue")
@@ -172,12 +168,12 @@ class DashboardFrame(ttk.Frame):
 
         chart_box = ttk.LabelFrame(content, text="Sales Line Graph", padding=inner_padding)
         chart_box.grid(row=1, column=0, sticky="nsew", padx=(0, gap), pady=(gap, 0))
-        self.sales_chart = tk.Canvas(chart_box, height=120 if self.compact_layout else 170, bg="white", highlightthickness=0)
+        self.sales_chart = tk.Canvas(chart_box, height=self.theme.chart_height, bg="white", highlightthickness=0)
         self.sales_chart.pack(fill=tk.BOTH, expand=True)
 
         low_stock_box = ttk.LabelFrame(content, text="Low Stock Alerts", padding=inner_padding)
         low_stock_box.grid(row=1, column=1, sticky="nsew", pady=(gap, 0))
-        self.stock_table = ttk.Treeview(low_stock_box, columns=("name", "stock"), show="headings", height=4 if self.compact_layout else 6)
+        self.stock_table = ttk.Treeview(low_stock_box, columns=("name", "stock"), show="headings", height=self.theme.table_height_small)
         self.stock_table.heading("name", text="Product")
         self.stock_table.heading("stock", text="Stock")
         self.stock_table.column("name", width=180)

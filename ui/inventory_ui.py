@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from core import inventory
+from .theme_manager import ThemeManager
 
 
 class InventoryFrame(ttk.Frame):
@@ -11,6 +12,7 @@ class InventoryFrame(ttk.Frame):
         screen_w = top_level.winfo_screenwidth()
         screen_h = top_level.winfo_screenheight()
         self.compact_layout = screen_w < 1400 or screen_h < 820
+        self.theme = ThemeManager(self.compact_layout)
         self.selected_product_id: int | None = None
         self.search_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Select a product, then use Create / Update / Delete")
@@ -24,13 +26,11 @@ class InventoryFrame(ttk.Frame):
         header = ttk.Frame(self)
         header.pack(fill=tk.X)
 
-        title_size = 20 if self.compact_layout else 24
-        subhead_size = 11 if self.compact_layout else 13
-        ttk.Label(header, text="Inventory CRUD", font=("Segoe UI", title_size, "bold")).pack(anchor="w")
+        ttk.Label(header, text="Inventory CRUD", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
         ttk.Label(
             header,
             text="Create products from a modal form, update stock with buttons, or delete with confirmation.",
-            font=("Segoe UI", subhead_size),
+            font=("Segoe UI", self.theme.body_medium),
         ).pack(anchor="w", pady=(4, 0))
 
         toolbar = ttk.Frame(self)
@@ -88,9 +88,6 @@ class InventoryFrame(ttk.Frame):
         ttk.Label(footer, textvariable=self.status_var).pack(side=tk.LEFT)
 
     def _create_toolbar_button(self, parent: tk.Widget, text: str, command, color: str) -> tk.Button:
-        btn_padx = 12 if self.compact_layout else 16
-        btn_pady = 6 if self.compact_layout else 8
-        btn_font_size = 11 if self.compact_layout else 13
         return tk.Button(
             parent,
             text=text,
@@ -100,9 +97,9 @@ class InventoryFrame(ttk.Frame):
             activebackground=color,
             activeforeground="white",
             relief=tk.FLAT,
-            padx=btn_padx,
-            pady=btn_pady,
-            font=("Segoe UI", btn_font_size, "bold"),
+            padx=self.theme.button_padding_x,
+            pady=self.theme.button_padding_y,
+            font=("Segoe UI", self.theme.body_medium, "bold"),
             cursor="hand2",
         )
 

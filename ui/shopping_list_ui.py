@@ -2,15 +2,13 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from core import inventory, shopping_list
+from ui.theme import get_theme
 
 
 class ShoppingListFrame(ttk.Frame):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master, padding=14)
-        top_level = master.winfo_toplevel()
-        screen_w = top_level.winfo_screenwidth()
-        screen_h = top_level.winfo_screenheight()
-        self.compact_layout = screen_w < 1400 or screen_h < 820
+        self.theme = get_theme()
         self.selected_product_id: int | None = None
         self.selected_list_item_id: int | None = None
         self.checked_product_ids: set[int] = set()
@@ -29,15 +27,15 @@ class ShoppingListFrame(ttk.Frame):
         header = ttk.Frame(self)
         header.pack(fill=tk.X)
 
-        ttk.Label(header, text="Shopping List", font=("Segoe UI", 20 if self.compact_layout else 24, "bold")).pack(anchor="w")
+        ttk.Label(header, text="Shopping List", font=("Segoe UI", self.theme.title_large, "bold")).pack(anchor="w")
         ttk.Label(
             header,
             text="Select products, set quantities, and track what to buy.",
-            font=("Segoe UI", 11 if self.compact_layout else 13),
-        ).pack(anchor="w", pady=(3 if self.compact_layout else 4, 0))
+            font=("Segoe UI", self.theme.heading_medium),
+        ).pack(anchor="w", pady=(self.theme.padding_xs, 0))
 
         content = ttk.Frame(self)
-        content.pack(fill=tk.BOTH, expand=True, pady=(8 if self.compact_layout else 12, 0))
+        content.pack(fill=tk.BOTH, expand=True, pady=(self.theme.gap_medium, 0))
         content.columnconfigure(0, weight=1)
         content.columnconfigure(1, weight=2)
         content.rowconfigure(0, weight=1)
@@ -46,13 +44,10 @@ class ShoppingListFrame(ttk.Frame):
         self._build_list_panel(content)
 
         footer = ttk.Frame(self)
-        footer.pack(fill=tk.X, pady=(4 if self.compact_layout else 8, 0))
+        footer.pack(fill=tk.X, pady=(self.theme.padding_small, 0))
         ttk.Label(footer, textvariable=self.status_var).pack(side=tk.LEFT)
 
     def _create_button(self, parent: tk.Widget, text: str, command, color: str) -> tk.Button:
-        btn_padx = 8 if self.compact_layout else 10
-        btn_pady = 4 if self.compact_layout else 5
-        btn_font_size = 8 if self.compact_layout else 9
         return tk.Button(
             parent,
             text=text,
@@ -62,20 +57,20 @@ class ShoppingListFrame(ttk.Frame):
             activebackground=color,
             activeforeground="white",
             relief=tk.FLAT,
-            padx=btn_padx,
-            pady=btn_pady,
-            font=("Segoe UI", btn_font_size, "bold"),
+            padx=self.theme.button_padx_small,
+            pady=self.theme.button_pady_small,
+            font=("Segoe UI", self.theme.body_small, "bold"),
             cursor="hand2",
         )
 
     def _build_product_panel(self, parent: ttk.Frame) -> None:
-        panel = ttk.LabelFrame(parent, text="Products", padding=8 if self.compact_layout else 10)
-        panel.grid(row=0, column=0, sticky="nsew", padx=(0, 6 if self.compact_layout else 8))
+        panel = ttk.LabelFrame(parent, text="Products", padding=self.theme.padding_medium)
+        panel.grid(row=0, column=0, sticky="nsew", padx=(0, self.theme.gap_medium))
         panel.columnconfigure(0, weight=1)
         panel.rowconfigure(2, weight=1)
 
         search_row = ttk.Frame(panel)
-        search_row.grid(row=0, column=0, sticky="ew", pady=(0, 6 if self.compact_layout else 8))
+        search_row.grid(row=0, column=0, sticky="ew", pady=(0, self.theme.gap_medium))
         search_row.columnconfigure(0, weight=1)
 
         entry = ttk.Entry(search_row, textvariable=self.product_search_var)
@@ -85,7 +80,7 @@ class ShoppingListFrame(ttk.Frame):
         self._create_button(search_row, "Search", self._search_products, "#1d4ed8").grid(row=0, column=1, padx=(6, 0))
 
         columns = ("pick", "id", "name", "price")
-        self.product_table = ttk.Treeview(panel, columns=columns, show="headings", height=11 if self.compact_layout else 14)
+        self.product_table = ttk.Treeview(panel, columns=columns, show="headings", height=self.theme.table_height_large)
         self.product_table.heading("pick", text="Pick")
         self.product_table.heading("id", text="ID")
         self.product_table.heading("name", text="Product")
@@ -93,8 +88,8 @@ class ShoppingListFrame(ttk.Frame):
 
         self.product_table.column("pick", width=48, anchor=tk.CENTER)
         self.product_table.column("id", width=48, anchor=tk.CENTER)
-        self.product_table.column("name", width=190 if self.compact_layout else 220)
-        self.product_table.column("price", width=88, anchor=tk.E)
+        self.product_table.column("name", width=self.theme.table_column_width_name)
+        self.product_table.column("price", width=self.theme.table_column_width_price, anchor=tk.E)
         self.product_table.grid(row=2, column=0, sticky="nsew")
 
         product_scroll = ttk.Scrollbar(panel, orient=tk.VERTICAL, command=self.product_table.yview)
@@ -104,7 +99,7 @@ class ShoppingListFrame(ttk.Frame):
         self.product_table.bind("<Button-1>", self._toggle_product_check)
 
         add_row = ttk.Frame(panel)
-        add_row.grid(row=3, column=0, sticky="ew", pady=(6 if self.compact_layout else 8, 0))
+        add_row.grid(row=3, column=0, sticky="ew", pady=(self.theme.gap_medium, 0))
 
         ttk.Label(add_row, text="Qty:").pack(side=tk.LEFT)
         qty_entry = ttk.Entry(add_row, textvariable=self.qty_var, width=5, justify=tk.CENTER)
@@ -116,13 +111,13 @@ class ShoppingListFrame(ttk.Frame):
         self._create_button(add_row, "Add Low Stock", self._add_low_stock_items, "#7c3aed").pack(side=tk.LEFT, padx=(6, 0))
 
     def _build_list_panel(self, parent: ttk.Frame) -> None:
-        panel = ttk.LabelFrame(parent, text="Current Shopping List", padding=8 if self.compact_layout else 10)
+        panel = ttk.LabelFrame(parent, text="Current Shopping List", padding=self.theme.padding_medium)
         panel.grid(row=0, column=1, sticky="nsew")
         panel.columnconfigure(0, weight=1)
         panel.rowconfigure(1, weight=1)
 
         top_row = ttk.Frame(panel)
-        top_row.grid(row=0, column=0, sticky="ew", pady=(0, 6 if self.compact_layout else 8))
+        top_row.grid(row=0, column=0, sticky="ew", pady=(0, self.theme.gap_medium))
 
         ttk.Checkbutton(
             top_row,
@@ -131,14 +126,14 @@ class ShoppingListFrame(ttk.Frame):
             command=self.refresh,
         ).pack(side=tk.LEFT)
 
-        ttk.Label(top_row, textvariable=self.total_var, font=("Segoe UI", 10 if self.compact_layout else 11, "bold")).pack(side=tk.RIGHT, padx=(8, 0))
+        ttk.Label(top_row, textvariable=self.total_var, font=("Segoe UI", self.theme.body_medium, "bold")).pack(side=tk.RIGHT, padx=(8, 0))
 
         self._create_button(top_row, "Refresh", self.refresh, "#64748b").pack(side=tk.RIGHT)
         self._create_button(top_row, "Save PDF", self._save_pdf, "#0f766e").pack(side=tk.RIGHT, padx=(6, 0))
         self._create_button(top_row, "Remove All", self._remove_all, "#dc2626").pack(side=tk.RIGHT, padx=(6, 0))
 
         columns = ("pick", "id", "name", "original_price", "qty", "status")
-        self.list_table = ttk.Treeview(panel, columns=columns, show="headings", height=12 if self.compact_layout else 16)
+        self.list_table = ttk.Treeview(panel, columns=columns, show="headings", height=self.theme.table_height_large)
         self.list_table.heading("pick", text="✓")
         self.list_table.heading("id", text="ID")
         self.list_table.heading("name", text="Product")
@@ -147,11 +142,11 @@ class ShoppingListFrame(ttk.Frame):
         self.list_table.heading("status", text="Status")
 
         self.list_table.column("pick", width=40, anchor=tk.CENTER)
-        self.list_table.column("id", width=45, anchor=tk.CENTER)
-        self.list_table.column("name", width=200 if self.compact_layout else 220, anchor=tk.W)
-        self.list_table.column("original_price", width=70, anchor=tk.E)
-        self.list_table.column("qty", width=50, anchor=tk.CENTER)
-        self.list_table.column("status", width=70, anchor=tk.CENTER)
+        self.list_table.column("id", width=self.theme.table_column_width_id, anchor=tk.CENTER)
+        self.list_table.column("name", width=self.theme.table_column_width_name, anchor=tk.W)
+        self.list_table.column("original_price", width=self.theme.table_column_width_price, anchor=tk.E)
+        self.list_table.column("qty", width=self.theme.table_column_width_qty, anchor=tk.CENTER)
+        self.list_table.column("status", width=self.theme.table_column_width_status, anchor=tk.CENTER)
         self.list_table.grid(row=1, column=0, sticky="nsew")
 
         list_scroll = ttk.Scrollbar(panel, orient=tk.VERTICAL, command=self.list_table.yview)
@@ -161,7 +156,7 @@ class ShoppingListFrame(ttk.Frame):
         self.list_table.bind("<Button-1>", self._toggle_list_item_check)
 
         action_row = ttk.Frame(panel)
-        action_row.grid(row=2, column=0, sticky="ew", pady=(6 if self.compact_layout else 8, 0))
+        action_row.grid(row=2, column=0, sticky="ew", pady=(self.theme.gap_medium, 0))
 
         self._create_button(action_row, "Select All", self._select_all_list_items, "#2563eb").pack(side=tk.LEFT)
         self._create_button(action_row, "Clear Selection", self._clear_list_selection, "#64748b").pack(side=tk.LEFT, padx=(6, 0))

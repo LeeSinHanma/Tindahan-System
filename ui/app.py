@@ -4,6 +4,7 @@ from tkinter import ttk, messagebox
 
 from db import database
 from db.database import record_user_audit
+from ui.theme import Theme, set_theme
 from ui.login_ui import LoginModal, LoginFrame
 from ui.dashboard_ui import DashboardFrame
 from ui.debt_tracker_ui import DebtTrackerFrame
@@ -22,6 +23,10 @@ class App:
         self.root.title("Tindahan POS + Inventory")
         self._configure_global_typography()
         self._configure_window_geometry()
+
+        # Initialize centralized theme
+        theme = Theme(self.root)
+        set_theme(theme)
 
         # ensure database and default admin exist
         database.init_database()
@@ -218,13 +223,8 @@ class App:
         ).pack(fill=tk.X, padx=16, pady=pady)
 
     def _add_nav_button(self, parent: ttk.Frame, text: str, screen_name: str) -> None:
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
-        compact_layout = screen_w < 1400 or screen_h < 820
-        
-        btn_padx = 12 if compact_layout else 16
-        btn_pady = 10 if compact_layout else 14
-        btn_font_size = 10 if compact_layout else 11
+        from ui.theme import get_theme
+        theme = get_theme()
         
         button = tk.Button(
             parent,
@@ -232,13 +232,13 @@ class App:
             command=lambda name=screen_name: self._show_screen(name),
             anchor="w",
             relief=tk.FLAT,
-            padx=btn_padx,
-            pady=btn_pady,
+            padx=theme.button_padx_medium,
+            pady=theme.button_pady_large,
             bg="#1e293b",
             fg="#e2e8f0",
             activebackground="#334155",
             activeforeground="#ffffff",
-            font=("Segoe UI", btn_font_size, "bold"),
+            font=("Segoe UI", theme.button_font, "bold"),
             cursor="hand2",
         )
         button.pack(fill=tk.X, pady=(0, 8))

@@ -6,6 +6,7 @@ from core.cart import Cart
 from core.inventory import get_product_by_barcode, search_products
 from core.sales import complete_sale
 from core import debt_tracker
+from .theme_manager import ThemeManager
 
 
 class POSFrame(ttk.Frame):
@@ -15,6 +16,7 @@ class POSFrame(ttk.Frame):
         screen_w = top_level.winfo_screenwidth()
         screen_h = top_level.winfo_screenheight()
         self.compact_layout = screen_w < 1400 or screen_h < 820
+        self.theme = ThemeManager(self.compact_layout)
         self.cart = Cart()
         self.selected_product_id: int | None = None
         self.selected_search_product_id: int | None = None
@@ -31,18 +33,12 @@ class POSFrame(ttk.Frame):
 
     def _configure_styles(self) -> None:
         style = ttk.Style(self)
-        header_size = 14 if self.compact_layout else 16
-        subhead_size = 9 if self.compact_layout else 10
-        metric_label_size = 9 if self.compact_layout else 10
-        metric_value_size = 13 if self.compact_layout else 16
-        rowheight = 22 if self.compact_layout else 28
-
-        style.configure("POSHeader.TLabel", font=("Segoe UI", header_size, "bold"))
-        style.configure("POSSubhead.TLabel", font=("Segoe UI", subhead_size))
-        style.configure("POSMetricLabel.TLabel", font=("Segoe UI", metric_label_size, "bold"))
-        style.configure("POSMetricValue.TLabel", font=("Segoe UI", metric_value_size, "bold"))
-        style.configure("Treeview", rowheight=rowheight)
-        style.configure("Treeview.Heading", font=("Segoe UI", 9 if self.compact_layout else 10, "bold"))
+        style.configure("POSHeader.TLabel", font=("Segoe UI", self.theme.heading_large, "bold"))
+        style.configure("POSSubhead.TLabel", font=("Segoe UI", self.theme.body_small))
+        style.configure("POSMetricLabel.TLabel", font=("Segoe UI", self.theme.body_small, "bold"))
+        style.configure("POSMetricValue.TLabel", font=("Segoe UI", self.theme.heading_huge, "bold"))
+        style.configure("Treeview", rowheight=self.theme.table_row_height)
+        style.configure("Treeview.Heading", font=("Segoe UI", self.theme.body_small, "bold"))
 
     def _build_ui(self) -> None:
         header = ttk.Frame(self)
@@ -56,9 +52,9 @@ class POSFrame(ttk.Frame):
         ).pack(anchor="w", pady=(2, 0))
 
         metrics = ttk.Frame(self)
-        metrics.pack(fill=tk.X, pady=(6 if self.compact_layout else 8, 6 if self.compact_layout else 8))
+        metrics.pack(fill=tk.X, pady=(self.theme.gap_medium, self.theme.gap_medium))
 
-        card_padding = 6 if self.compact_layout else 8
+        card_padding = self.theme.padding_medium
 
         total_card = ttk.LabelFrame(metrics, text="Total Due", padding=card_padding)
         total_card.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -69,21 +65,21 @@ class POSFrame(ttk.Frame):
         ttk.Label(items_card, textvariable=self.items_count_var, style="POSMetricValue.TLabel").pack(anchor="w")
 
         scan_box = ttk.LabelFrame(self, text="Barcode Scanner", padding=card_padding)
-        scan_box.pack(fill=tk.X, pady=(0, 6 if self.compact_layout else 8))
+        scan_box.pack(fill=tk.X, pady=(0, self.theme.gap_medium))
         ttk.Label(scan_box, text="Barcode:", style="POSMetricLabel.TLabel").pack(side=tk.LEFT)
 
-        self.barcode_entry = ttk.Entry(scan_box, textvariable=self.barcode_var, font=("Consolas", 11 if self.compact_layout else 14))
+        self.barcode_entry = ttk.Entry(scan_box, textvariable=self.barcode_var, font=("Consolas", self.theme.monospace_medium))
         self.barcode_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
         self.barcode_entry.bind("<Return>", self._on_scan_enter)
 
         search_box = ttk.LabelFrame(self, text="Search Products", padding=card_padding)
-        search_box.pack(fill=tk.X, pady=(0, 6 if self.compact_layout else 8))
+        search_box.pack(fill=tk.X, pady=(0, self.theme.gap_medium))
 
         search_row = ttk.Frame(search_box)
         search_row.pack(fill=tk.X)
 
         ttk.Label(search_row, text="Search:", style="POSMetricLabel.TLabel").pack(side=tk.LEFT)
-        self.search_entry = ttk.Entry(search_row, textvariable=self.search_var, font=("Segoe UI", 10 if self.compact_layout else 13))
+        self.search_entry = ttk.Entry(search_row, textvariable=self.search_var, font=("Segoe UI", self.theme.body_medium))
         self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 8))
         self.search_entry.bind("<Return>", self._on_search_enter)
 
@@ -91,10 +87,10 @@ class POSFrame(ttk.Frame):
         self._create_action_button(search_row, "Add Selected", self._add_selected_search_product, "#16a34a").pack(side=tk.LEFT, padx=(8, 0))
 
         results_box = ttk.Frame(search_box)
-        results_box.pack(fill=tk.X, expand=True, pady=(6 if self.compact_layout else 8, 0))
+        results_box.pack(fill=tk.X, expand=True, pady=(self.theme.gap_medium, 0))
 
         search_columns = ("id", "name", "barcode", "price", "stock")
-        self.search_table = ttk.Treeview(results_box, columns=search_columns, show="headings", height=3 if self.compact_layout else 5)
+        self.search_table = ttk.Treeview(results_box, columns=search_columns, show="headings", height=self.theme.table_height_small)
         self.search_table.heading("id", text="ID")
         self.search_table.heading("name", text="Product")
         self.search_table.heading("barcode", text="Barcode")
@@ -117,7 +113,7 @@ class POSFrame(ttk.Frame):
         table_box.pack(fill=tk.BOTH, expand=True)
 
         columns = ("id", "name", "price", "qty", "subtotal", "stock")
-        self.cart_table = ttk.Treeview(table_box, columns=columns, show="headings", height=6 if self.compact_layout else 10)
+        self.cart_table = ttk.Treeview(table_box, columns=columns, show="headings", height=self.theme.table_height_medium)
         self.cart_table.heading("id", text="ID")
         self.cart_table.heading("name", text="Product")
         self.cart_table.heading("price", text="Price")
@@ -139,13 +135,13 @@ class POSFrame(ttk.Frame):
         self.cart_table.bind("<Double-1>", self._double_click_add_qty)
 
         actions = ttk.Frame(self)
-        actions.pack(fill=tk.X, pady=(6 if self.compact_layout else 8, 4 if self.compact_layout else 6))
+        actions.pack(fill=tk.X, pady=(self.theme.gap_medium, self.theme.gap_small))
 
         qty_tools = ttk.Frame(actions)
         qty_tools.pack(side=tk.LEFT)
 
         ttk.Label(qty_tools, text="Quick Qty:").pack(side=tk.LEFT)
-        qty_entry = ttk.Entry(qty_tools, textvariable=self.qty_var, width=5, justify=tk.CENTER, font=("Segoe UI", 10 if self.compact_layout else 11))
+        qty_entry = ttk.Entry(qty_tools, textvariable=self.qty_var, width=5, justify=tk.CENTER, font=("Segoe UI", self.theme.body_medium))
         qty_entry.pack(side=tk.LEFT, padx=(6, 4))
         qty_entry.bind("<Return>", self._set_selected_quantity)
 
@@ -161,7 +157,7 @@ class POSFrame(ttk.Frame):
         self._create_action_button(actions, "Checkout", self._checkout, "#16a34a").pack(side=tk.RIGHT, padx=(0, 8))
 
         footer = ttk.Frame(self)
-        footer.pack(fill=tk.X, pady=(2 if self.compact_layout else 4, 0))
+        footer.pack(fill=tk.X, pady=(self.theme.gap_small, 0))
         ttk.Label(footer, textvariable=self.status_var).pack(side=tk.LEFT)
 
     def _create_action_button(self, parent: tk.Widget, text: str, command, color: str) -> tk.Button:
@@ -174,9 +170,9 @@ class POSFrame(ttk.Frame):
             activebackground=color,
             activeforeground="white",
             relief=tk.FLAT,
-            padx=8 if self.compact_layout else 10,
-            pady=4 if self.compact_layout else 5,
-            font=("Segoe UI", 9 if self.compact_layout else 10, "bold"),
+            padx=self.theme.button_padding_x,
+            pady=self.theme.button_padding_y,
+            font=("Segoe UI", self.theme.body_small, "bold"),
             cursor="hand2",
         )
 

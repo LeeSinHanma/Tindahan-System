@@ -3,6 +3,7 @@ from tkinter import ttk
 
 from db import database
 from core import debt_tracker
+from .theme_manager import ThemeManager
 
 
 class FinanceFrame(ttk.Frame):
@@ -12,6 +13,7 @@ class FinanceFrame(ttk.Frame):
         screen_w = top_level.winfo_screenwidth()
         screen_h = top_level.winfo_screenheight()
         self.compact_layout = screen_w < 1400 or screen_h < 820
+        self.theme = ThemeManager(self.compact_layout)
 
         self._build_ui()
         self.refresh()
@@ -20,8 +22,8 @@ class FinanceFrame(ttk.Frame):
         header = ttk.Frame(self)
         header.pack(fill=tk.X)
 
-        ttk.Label(header, text="Finance", font=("Segoe UI", 20 if self.compact_layout else 24, "bold")).pack(anchor="w")
-        ttk.Label(header, text="Summary of monetary metrics.", font=("Segoe UI", 11 if self.compact_layout else 13)).pack(anchor="w", pady=(4, 8))
+        ttk.Label(header, text="Finance", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
+        ttk.Label(header, text="Summary of monetary metrics.", font=("Segoe UI", self.theme.body_medium)).pack(anchor="w", pady=(4, 8))
 
         cards = ttk.Frame(self)
         cards.pack(fill=tk.X, pady=(8, 12))
