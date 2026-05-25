@@ -1,8 +1,14 @@
 import sqlite3
+import sys
 from pathlib import Path
 
 
-DB_FILE = Path(__file__).resolve().parent.parent / "pos.db"
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent
+
+DB_FILE = BASE_DIR / "pos.db"
 LOW_STOCK_THRESHOLD = 10
 
 
@@ -99,6 +105,64 @@ def init_database() -> None:
         )
         _ensure_column(conn, "shopping_list_items", "purchased_at", "TEXT")
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS debt_tracker (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                person_name TEXT NOT NULL,
+                amount REAL NOT NULL,
+                is_paid INTEGER NOT NULL DEFAULT 0,
+                description TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                paid_at TEXT
+            )
+            """
+        )
+
+        _ensure_column(conn, "debt_tracker", "description", "TEXT DEFAULT ''")
+
+        # Customers table to support account-style debt tracking
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS customers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                is_admin INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        )
+
+        # ensure default admin user exists (hardcoded credentials)
+        conn.execute(
+            "INSERT OR IGNORE INTO users (username, password, is_admin) VALUES (?, ?, ?)",
+            ("admin", "KennyDLuffy213", 1),
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                username TEXT,
+                action TEXT NOT NULL,
+                details TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        )
+
         _ensure_column(conn, "products", "description", "TEXT NOT NULL DEFAULT ''")
         _ensure_column(conn, "products", "original_price", "REAL NOT NULL DEFAULT 0")
         _ensure_column(conn, "products", "sell_price", "REAL NOT NULL DEFAULT 0")
@@ -125,28 +189,20 @@ def init_database() -> None:
         if _stock_tracked_column_exists(conn):
             conn.execute("UPDATE products SET stock_tracked = COALESCE(stock_tracked, 0)")
 
-        sample_products = (
-            ("Coke 330ml", "Soft drink 330ml", "4800016641543", 18.00, 25.00, 100),
-            ("Lucky Me Pancit Canton", "Instant noodles", "4807770270001", 15.50, 18.50, 120),
-            ("SkyFlakes Crackers", "Salt crackers", "4808888031027", 8.00, 10.00, 200),
-            ("Bear Brand Milk 33g", "Powdered milk", "4800361412973", 12.00, 15.00, 80),
-            ("Nescafe Classic Stick", "Coffee stick pack", "4800361380036", 6.50, 8.00, 300),
-        )
-
-        conn.executemany(
-            """
-            INSERT OR IGNORE INTO products
-                (name, description, barcode, original_price, sell_price, stock)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            sample_products,
-        )
-
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
             ("low_stock_threshold", "10"),
         )
 
+        conn.commit()
+
+
+def record_user_audit(username: str | None, user_id: int | None, action: str, details: str | None = None) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO user_audit (user_id, username, action, details) VALUES (?, ?, ?, ?)",
+            (user_id, username, action, details),
+        )
         conn.commit()
 
 
@@ -313,6 +369,19 @@ def update_product(product_id: int, product_data: dict) -> None:
 
 def delete_product(product_id: int) -> None:
     with get_connection() as conn:
+        usage_count = conn.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM sale_items WHERE product_id = ?) +
+                (SELECT COUNT(*) FROM shopping_list_items WHERE product_id = ?)
+            AS usage_count
+            """,
+            (product_id, product_id),
+        ).fetchone()["usage_count"]
+
+        if usage_count:
+            raise ValueError("Cannot delete a product that is used in a sale or shopping list.")
+
         conn.execute("DELETE FROM products WHERE id = ?", (product_id,))
         conn.commit()
 
