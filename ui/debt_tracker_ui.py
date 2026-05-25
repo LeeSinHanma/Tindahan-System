@@ -19,6 +19,7 @@ class DebtTrackerFrame(ttk.Frame):
         self.amount_var = tk.StringVar()
         self.description_var = tk.StringVar()
         self.new_customer_var = tk.StringVar()
+        self.new_customer_var.trace_add("write", lambda *args: self.refresh())
         self.status_var = tk.StringVar(value="Manage customer debt accounts.")
 
         self._build_ui()
@@ -278,10 +279,10 @@ class DebtTrackerFrame(ttk.Frame):
             return
 
         total_debt = debt_tracker.get_customer_total_debt(self.selected_customer)
-        if amount < total_debt:
+        if amount <= 0:
             messagebox.showerror(
                 "Invalid input",
-                f"Enter at least PHP {total_debt:.2f} to pay this customer's total debt.",
+                "Enter an amount greater than PHP 0.00 to pay.",
                 parent=self,
             )
             self._update_pay_button_state()
@@ -332,7 +333,7 @@ class DebtTrackerFrame(ttk.Frame):
             try:
                 amount = float(self.pay_amount_var.get().strip())
                 total_debt = debt_tracker.get_customer_total_debt(self.selected_customer)
-                enabled = amount >= total_debt and total_debt > 0
+                enabled = amount > 0 and total_debt > 0
             except ValueError:
                 enabled = False
             except Exception:
@@ -345,8 +346,11 @@ class DebtTrackerFrame(ttk.Frame):
         for row_id in self.customer_table.get_children():
             self.customer_table.delete(row_id)
 
+        search_term = self.new_customer_var.get().strip().lower()
         customers = debt_tracker.get_customers_with_totals()
         for customer in customers:
+            if search_term and search_term not in customer["person_name"].lower():
+                continue
             # show all customers, even if total_debt is zero
             total = customer.get("total_debt") or 0.0
             pending = customer.get("pending_count") or 0
