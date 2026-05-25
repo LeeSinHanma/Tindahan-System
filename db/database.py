@@ -1,8 +1,14 @@
 import sqlite3
+import sys
 from pathlib import Path
 
 
-DB_FILE = Path(__file__).resolve().parent.parent / "pos.db"
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent
+
+DB_FILE = BASE_DIR / "pos.db"
 LOW_STOCK_THRESHOLD = 10
 
 
@@ -182,23 +188,6 @@ def init_database() -> None:
 
         if _stock_tracked_column_exists(conn):
             conn.execute("UPDATE products SET stock_tracked = COALESCE(stock_tracked, 0)")
-
-        sample_products = (
-            ("Coke 330ml", "Soft drink 330ml", "4800016641543", 18.00, 25.00, 100),
-            ("Lucky Me Pancit Canton", "Instant noodles", "4807770270001", 15.50, 18.50, 120),
-            ("SkyFlakes Crackers", "Salt crackers", "4808888031027", 8.00, 10.00, 200),
-            ("Bear Brand Milk 33g", "Powdered milk", "4800361412973", 12.00, 15.00, 80),
-            ("Nescafe Classic Stick", "Coffee stick pack", "4800361380036", 6.50, 8.00, 300),
-        )
-
-        conn.executemany(
-            """
-            INSERT OR IGNORE INTO products
-                (name, description, barcode, original_price, sell_price, stock)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            sample_products,
-        )
 
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
