@@ -1,15 +1,22 @@
 from datetime import datetime
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 from core.cart import Cart
 from core.inventory import get_product_by_barcode, search_products
 from core.sales import complete_sale
+from core import debt_tracker
+from .theme_manager import ThemeManager
 
 
 class POSFrame(ttk.Frame):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master, padding=14)
+        top_level = master.winfo_toplevel()
+        screen_w = top_level.winfo_screenwidth()
+        screen_h = top_level.winfo_screenheight()
+        self.compact_layout = screen_w < 1400 or screen_h < 820
+        self.theme = ThemeManager(self.compact_layout)
         self.cart = Cart()
         self.selected_product_id: int | None = None
         self.selected_search_product_id: int | None = None
@@ -26,12 +33,12 @@ class POSFrame(ttk.Frame):
 
     def _configure_styles(self) -> None:
         style = ttk.Style(self)
-        style.configure("POSHeader.TLabel", font=("Segoe UI", 16, "bold"))
-        style.configure("POSSubhead.TLabel", font=("Segoe UI", 10))
-        style.configure("POSMetricLabel.TLabel", font=("Segoe UI", 10, "bold"))
-        style.configure("POSMetricValue.TLabel", font=("Segoe UI", 16, "bold"))
-        style.configure("Treeview", rowheight=28)
-        style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"))
+        style.configure("POSHeader.TLabel", font=("Segoe UI", self.theme.heading_large, "bold"))
+        style.configure("POSSubhead.TLabel", font=("Segoe UI", self.theme.body_small))
+        style.configure("POSMetricLabel.TLabel", font=("Segoe UI", self.theme.body_small, "bold"))
+        style.configure("POSMetricValue.TLabel", font=("Segoe UI", self.theme.heading_huge, "bold"))
+        style.configure("Treeview", rowheight=self.theme.table_row_height)
+        style.configure("Treeview.Heading", font=("Segoe UI", self.theme.body_small, "bold"))
 
     def _build_ui(self) -> None:
         header = ttk.Frame(self)
@@ -45,32 +52,34 @@ class POSFrame(ttk.Frame):
         ).pack(anchor="w", pady=(2, 0))
 
         metrics = ttk.Frame(self)
-        metrics.pack(fill=tk.X, pady=(8, 8))
+        metrics.pack(fill=tk.X, pady=(self.theme.gap_medium, self.theme.gap_medium))
 
-        total_card = ttk.LabelFrame(metrics, text="Total Due", padding=8)
+        card_padding = self.theme.padding_medium
+
+        total_card = ttk.LabelFrame(metrics, text="Total Due", padding=card_padding)
         total_card.pack(side=tk.LEFT, fill=tk.X, expand=True)
         ttk.Label(total_card, textvariable=self.total_var, style="POSMetricValue.TLabel").pack(anchor="w")
 
-        items_card = ttk.LabelFrame(metrics, text="Cart", padding=8)
+        items_card = ttk.LabelFrame(metrics, text="Cart", padding=card_padding)
         items_card.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
         ttk.Label(items_card, textvariable=self.items_count_var, style="POSMetricValue.TLabel").pack(anchor="w")
 
-        scan_box = ttk.LabelFrame(self, text="Barcode Scanner", padding=8)
-        scan_box.pack(fill=tk.X, pady=(0, 8))
+        scan_box = ttk.LabelFrame(self, text="Barcode Scanner", padding=card_padding)
+        scan_box.pack(fill=tk.X, pady=(0, self.theme.gap_medium))
         ttk.Label(scan_box, text="Barcode:", style="POSMetricLabel.TLabel").pack(side=tk.LEFT)
 
-        self.barcode_entry = ttk.Entry(scan_box, textvariable=self.barcode_var, font=("Consolas", 14))
+        self.barcode_entry = ttk.Entry(scan_box, textvariable=self.barcode_var, font=("Consolas", self.theme.monospace_medium))
         self.barcode_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
         self.barcode_entry.bind("<Return>", self._on_scan_enter)
 
-        search_box = ttk.LabelFrame(self, text="Search Products", padding=8)
-        search_box.pack(fill=tk.BOTH, pady=(0, 8))
+        search_box = ttk.LabelFrame(self, text="Search Products", padding=card_padding)
+        search_box.pack(fill=tk.X, pady=(0, self.theme.gap_medium))
 
         search_row = ttk.Frame(search_box)
         search_row.pack(fill=tk.X)
 
         ttk.Label(search_row, text="Search:", style="POSMetricLabel.TLabel").pack(side=tk.LEFT)
-        self.search_entry = ttk.Entry(search_row, textvariable=self.search_var, font=("Segoe UI", 13))
+        self.search_entry = ttk.Entry(search_row, textvariable=self.search_var, font=("Segoe UI", self.theme.body_medium))
         self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 8))
         self.search_entry.bind("<Return>", self._on_search_enter)
 
@@ -78,20 +87,20 @@ class POSFrame(ttk.Frame):
         self._create_action_button(search_row, "Add Selected", self._add_selected_search_product, "#16a34a").pack(side=tk.LEFT, padx=(8, 0))
 
         results_box = ttk.Frame(search_box)
-        results_box.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        results_box.pack(fill=tk.X, expand=True, pady=(self.theme.gap_medium, 0))
 
         search_columns = ("id", "name", "barcode", "price", "stock")
-        self.search_table = ttk.Treeview(results_box, columns=search_columns, show="headings", height=5)
+        self.search_table = ttk.Treeview(results_box, columns=search_columns, show="headings", height=self.theme.table_height_small)
         self.search_table.heading("id", text="ID")
         self.search_table.heading("name", text="Product")
         self.search_table.heading("barcode", text="Barcode")
         self.search_table.heading("price", text="Price")
         self.search_table.heading("stock", text="Stock")
-        self.search_table.column("id", width=60, anchor=tk.CENTER)
-        self.search_table.column("name", width=260)
-        self.search_table.column("barcode", width=180)
-        self.search_table.column("price", width=100, anchor=tk.E)
-        self.search_table.column("stock", width=80, anchor=tk.CENTER)
+        self.search_table.column("id", width=45, anchor=tk.CENTER)
+        self.search_table.column("name", width=180, anchor=tk.W)
+        self.search_table.column("barcode", width=120, anchor=tk.W)
+        self.search_table.column("price", width=70, anchor=tk.E)
+        self.search_table.column("stock", width=60, anchor=tk.CENTER)
         self.search_table.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
 
         search_scroll = ttk.Scrollbar(results_box, orient=tk.VERTICAL, command=self.search_table.yview)
@@ -100,11 +109,11 @@ class POSFrame(ttk.Frame):
         self.search_table.bind("<<TreeviewSelect>>", self._on_search_select)
         self.search_table.bind("<Double-1>", self._add_selected_search_product)
 
-        table_box = ttk.LabelFrame(self, text="Current Cart", padding=8)
+        table_box = ttk.LabelFrame(self, text="Current Cart", padding=card_padding)
         table_box.pack(fill=tk.BOTH, expand=True)
 
         columns = ("id", "name", "price", "qty", "subtotal", "stock")
-        self.cart_table = ttk.Treeview(table_box, columns=columns, show="headings", height=10)
+        self.cart_table = ttk.Treeview(table_box, columns=columns, show="headings", height=self.theme.table_height_medium)
         self.cart_table.heading("id", text="ID")
         self.cart_table.heading("name", text="Product")
         self.cart_table.heading("price", text="Price")
@@ -112,12 +121,12 @@ class POSFrame(ttk.Frame):
         self.cart_table.heading("subtotal", text="Subtotal")
         self.cart_table.heading("stock", text="Stock")
 
-        self.cart_table.column("id", width=60, anchor=tk.CENTER)
-        self.cart_table.column("name", width=300)
-        self.cart_table.column("price", width=100, anchor=tk.E)
-        self.cart_table.column("qty", width=60, anchor=tk.CENTER)
-        self.cart_table.column("subtotal", width=110, anchor=tk.E)
-        self.cart_table.column("stock", width=60, anchor=tk.CENTER)
+        self.cart_table.column("id", width=45, anchor=tk.CENTER)
+        self.cart_table.column("name", width=180, anchor=tk.W)
+        self.cart_table.column("price", width=70, anchor=tk.E)
+        self.cart_table.column("qty", width=50, anchor=tk.CENTER)
+        self.cart_table.column("subtotal", width=85, anchor=tk.E)
+        self.cart_table.column("stock", width=55, anchor=tk.CENTER)
         self.cart_table.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
         cart_scroll = ttk.Scrollbar(table_box, orient=tk.VERTICAL, command=self.cart_table.yview)
         cart_scroll.pack(side=tk.RIGHT, fill=tk.Y)
@@ -126,13 +135,13 @@ class POSFrame(ttk.Frame):
         self.cart_table.bind("<Double-1>", self._double_click_add_qty)
 
         actions = ttk.Frame(self)
-        actions.pack(fill=tk.X, pady=(8, 6))
+        actions.pack(fill=tk.X, pady=(self.theme.gap_medium, self.theme.gap_small))
 
         qty_tools = ttk.Frame(actions)
         qty_tools.pack(side=tk.LEFT)
 
         ttk.Label(qty_tools, text="Quick Qty:").pack(side=tk.LEFT)
-        qty_entry = ttk.Entry(qty_tools, textvariable=self.qty_var, width=6, justify=tk.CENTER, font=("Segoe UI", 11))
+        qty_entry = ttk.Entry(qty_tools, textvariable=self.qty_var, width=5, justify=tk.CENTER, font=("Segoe UI", self.theme.body_medium))
         qty_entry.pack(side=tk.LEFT, padx=(6, 4))
         qty_entry.bind("<Return>", self._set_selected_quantity)
 
@@ -144,10 +153,11 @@ class POSFrame(ttk.Frame):
         self._create_action_button(actions, "+ Qty", self._increase_quantity, "#0ea5e9").pack(side=tk.LEFT, padx=(8, 0))
         self._create_action_button(actions, "Remove", self._remove_selected, "#b91c1c").pack(side=tk.LEFT, padx=(8, 0))
         self._create_action_button(actions, "Clear Cart", self._clear_cart, "#475569").pack(side=tk.RIGHT)
+        self._create_action_button(actions, "Checkout Debt", self._checkout_debt, "#f59e0b").pack(side=tk.RIGHT, padx=(0, 8))
         self._create_action_button(actions, "Checkout", self._checkout, "#16a34a").pack(side=tk.RIGHT, padx=(0, 8))
 
         footer = ttk.Frame(self)
-        footer.pack(fill=tk.X, pady=(4, 0))
+        footer.pack(fill=tk.X, pady=(self.theme.gap_small, 0))
         ttk.Label(footer, textvariable=self.status_var).pack(side=tk.LEFT)
 
     def _create_action_button(self, parent: tk.Widget, text: str, command, color: str) -> tk.Button:
@@ -160,9 +170,9 @@ class POSFrame(ttk.Frame):
             activebackground=color,
             activeforeground="white",
             relief=tk.FLAT,
-            padx=10,
-            pady=5,
-            font=("Segoe UI", 10, "bold"),
+            padx=self.theme.button_padding_x,
+            pady=self.theme.button_padding_y,
+            font=("Segoe UI", self.theme.body_small, "bold"),
             cursor="hand2",
         )
 
@@ -214,13 +224,13 @@ class POSFrame(ttk.Frame):
     def _add_selected_search_product(self, _event: tk.Event | None = None) -> None:
         selected = self.search_table.selection()
         if not selected:
-            self.status_var.set("Select a search result first")
+            messagebox.showerror("Invalid input", "Select a search result first", parent=self)
             return
 
         product_barcode = self.search_table.item(selected[0], "values")[2]
         product = get_product_by_barcode(product_barcode)
         if product is None:
-            self.status_var.set("Selected product not found")
+            messagebox.showerror("Invalid input", "Selected product not found", parent=self)
             return
 
         if product.get("stock_tracked", False) and product["stock"] <= 0:
@@ -313,23 +323,23 @@ class POSFrame(ttk.Frame):
     def _parse_qty_input(self) -> int | None:
         raw_value = self.qty_var.get().strip()
         if not raw_value:
-            self.status_var.set("Enter quantity first")
+            messagebox.showerror("Invalid input", "Enter quantity first", parent=self)
             return None
 
         if not raw_value.isdigit():
-            self.status_var.set("Quantity must be a whole number")
+            messagebox.showerror("Invalid input", "Quantity must be a whole number", parent=self)
             return None
 
         value = int(raw_value)
         if value <= 0:
-            self.status_var.set("Quantity must be at least 1")
+            messagebox.showerror("Invalid input", "Quantity must be at least 1", parent=self)
             return None
         return value
 
     def _set_selected_quantity(self, _event: tk.Event | None = None) -> None:
         item = self._selected_cart_item()
         if item is None:
-            self.status_var.set("Select an item first")
+            messagebox.showerror("Invalid input", "Select an item first", parent=self)
             return
 
         qty_value = self._parse_qty_input()
@@ -345,7 +355,7 @@ class POSFrame(ttk.Frame):
     def _adjust_selected_quantity(self, step: int) -> None:
         item = self._selected_cart_item()
         if item is None:
-            self.status_var.set("Select an item first")
+            messagebox.showerror("Invalid input", "Select an item first", parent=self)
             return
 
         new_qty = item["quantity"] + step
@@ -379,8 +389,18 @@ class POSFrame(ttk.Frame):
         modal.geometry(f"{width}x{height}")
         modal.resizable(False, False)
         modal.transient(self.winfo_toplevel())
-        modal.grab_set()
+        modal.update_idletasks()
+        modal.lift()
+        modal.focus_force()
+        try:
+            modal.attributes("-topmost", True)
+            modal.after_idle(lambda: modal.attributes("-topmost", False))
+        except tk.TclError:
+            pass
         self._center_modal(modal, width, height)
+        modal.lift()
+        modal.wait_visibility()
+        modal.grab_set()
 
         content = ttk.Frame(modal, padding=16)
         content.pack(fill=tk.BOTH, expand=True)
@@ -548,3 +568,155 @@ class POSFrame(ttk.Frame):
             f"Sale complete. ID: {sale_id} | Paid: PHP {amount_given:.2f} | Change: PHP {change:.2f}"
         )
         self.focus_barcode()
+
+    def _checkout_debt(self) -> None:
+        items = self.cart.get_items()
+        if not items:
+            self.status_var.set("Cart is empty")
+            self.focus_barcode()
+            return
+
+        modal = tk.Toplevel(self)
+        modal.title("Checkout as Debt")
+        width, height = 700, 420
+        modal.geometry(f"{width}x{height}")
+        modal.resizable(False, False)
+        modal.transient(self.winfo_toplevel())
+        modal.update_idletasks()
+        modal.lift()
+        modal.focus_force()
+        try:
+            modal.attributes("-topmost", True)
+            modal.after_idle(lambda: modal.attributes("-topmost", False))
+        except tk.TclError:
+            pass
+        self._center_modal(modal, width, height)
+        modal.lift()
+        modal.wait_visibility()
+        modal.grab_set()
+
+        content = ttk.Frame(modal, padding=12)
+        content.pack(fill=tk.BOTH, expand=True)
+
+        left = ttk.Frame(content)
+        left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
+        right = ttk.Frame(content)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        ttk.Label(left, text="Customers", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+
+        search_var = tk.StringVar()
+        new_customer_var = tk.StringVar()
+
+        search_entry = ttk.Entry(left, textvariable=search_var)
+        search_entry.pack(fill=tk.X, pady=(6, 4))
+
+        cust_columns = ("name", "total", "pending")
+        cust_table = ttk.Treeview(left, columns=cust_columns, show="headings", height=12)
+        cust_table.heading("name", text="Name")
+        cust_table.heading("total", text="Total Due")
+        cust_table.heading("pending", text="Pending")
+        cust_table.column("name", width=160)
+        cust_table.column("total", width=80, anchor=tk.E)
+        cust_table.column("pending", width=60, anchor=tk.CENTER)
+        cust_table.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(left, text="New / Search").pack(anchor="w", pady=(6, 0))
+        new_entry = ttk.Entry(left, textvariable=new_customer_var)
+        new_entry.pack(fill=tk.X, pady=(2, 4))
+
+        def load_customers(filter_text: str = ""):
+            for r in cust_table.get_children():
+                cust_table.delete(r)
+            customers = debt_tracker.get_customers_with_totals()
+            for c in customers:
+                name = c.get("person_name")
+                if filter_text and filter_text.lower() not in name.lower():
+                    continue
+                total = c.get("total_debt") or 0.0
+                pending = c.get("pending_count") or 0
+                cust_table.insert("", tk.END, values=(name, f"{total:.2f}", pending))
+
+        def on_search_change(*_args):
+            load_customers(search_var.get().strip())
+
+        search_var.trace_add("write", on_search_change)
+
+        def add_customer_action() -> None:
+            name = new_customer_var.get().strip()
+            if not name:
+                messagebox.showerror("Invalid input", "Enter a customer name", parent=modal)
+                return
+            if debt_tracker.add_customer(name):
+                new_customer_var.set("")
+                load_customers()
+                self.status_var.set(f"Customer '{name}' added")
+            else:
+                messagebox.showerror("Invalid input", "Failed to add customer or already exists", parent=modal)
+                return
+
+        btn_row = ttk.Frame(left)
+        btn_row.pack(fill=tk.X, pady=(6, 0))
+        tk.Button(btn_row, text="Add", command=add_customer_action, bg="#059669", fg="white", relief=tk.FLAT, padx=10, pady=6).pack(side=tk.LEFT)
+        tk.Button(btn_row, text="Close", command=modal.destroy, bg="#64748b", fg="white", relief=tk.FLAT, padx=10, pady=6).pack(side=tk.RIGHT)
+
+        # Right: show cart summary and actions
+        ttk.Label(right, text="Cart Items to Debt", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        cart_box = ttk.Frame(right)
+        cart_box.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+
+        cart_columns = ("name", "qty", "subtotal")
+        debt_items_table = ttk.Treeview(cart_box, columns=cart_columns, show="headings", height=12)
+        debt_items_table.heading("name", text="Product")
+        debt_items_table.heading("qty", text="Qty")
+        debt_items_table.heading("subtotal", text="Amount")
+        debt_items_table.column("name", width=360)
+        debt_items_table.column("qty", width=60, anchor=tk.CENTER)
+        debt_items_table.column("subtotal", width=100, anchor=tk.E)
+        debt_items_table.pack(fill=tk.BOTH, expand=True)
+
+        for it in items:
+            debt_items_table.insert("", tk.END, values=(it["name"], it["quantity"], f"{it['subtotal']:.2f}"))
+
+        action_row = ttk.Frame(right)
+        action_row.pack(fill=tk.X, pady=(8, 0))
+
+        selected_customer = {
+            "name": None
+        }
+
+        def on_customer_select(_event: tk.Event | None = None):
+            sel = cust_table.selection()
+            if not sel:
+                selected_customer["name"] = None
+                return
+            values = cust_table.item(sel[0], "values")
+            selected_customer["name"] = values[0]
+
+        cust_table.bind("<<TreeviewSelect>>", on_customer_select)
+
+        def submit_debt() -> None:
+            name = selected_customer.get("name") or new_customer_var.get().strip()
+            if not name:
+                messagebox.showerror("Invalid input", "Select or enter a customer name", parent=modal)
+                return
+
+            # ensure customer exists
+            if not any(c.get("person_name") == name for c in debt_tracker.get_customers_with_totals()):
+                debt_tracker.add_customer(name)
+
+            for it in items:
+                desc = f"{it['quantity']}x {it['name']}"
+                amount = float(it["subtotal"])
+                debt_tracker.add_debt(name, amount, desc)
+
+            self.cart.clear()
+            self._render_cart()
+            self.status_var.set(f"Added debt for {name}: PHP {sum(it['subtotal'] for it in items):.2f}")
+            modal.destroy()
+
+        tk.Button(action_row, text="Submit as Debt", command=submit_debt, bg="#f59e0b", fg="white", relief=tk.FLAT, padx=12, pady=8).pack(side=tk.RIGHT)
+
+        load_customers()
+        new_entry.focus_set()
+        modal.wait_window()

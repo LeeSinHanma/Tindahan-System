@@ -2,11 +2,17 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from core import inventory
+from .theme_manager import ThemeManager
 
 
 class InventoryFrame(ttk.Frame):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master, padding=14)
+        top_level = master.winfo_toplevel()
+        screen_w = top_level.winfo_screenwidth()
+        screen_h = top_level.winfo_screenheight()
+        self.compact_layout = screen_w < 1400 or screen_h < 820
+        self.theme = ThemeManager(self.compact_layout)
         self.selected_product_id: int | None = None
         self.search_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Select a product, then use Create / Update / Delete")
@@ -20,11 +26,11 @@ class InventoryFrame(ttk.Frame):
         header = ttk.Frame(self)
         header.pack(fill=tk.X)
 
-        ttk.Label(header, text="Inventory CRUD", font=("Segoe UI", 24, "bold")).pack(anchor="w")
+        ttk.Label(header, text="Inventory CRUD", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
         ttk.Label(
             header,
             text="Create products from a modal form, update stock with buttons, or delete with confirmation.",
-            font=("Segoe UI", 13),
+            font=("Segoe UI", self.theme.body_medium),
         ).pack(anchor="w", pady=(4, 0))
 
         toolbar = ttk.Frame(self)
@@ -59,13 +65,13 @@ class InventoryFrame(ttk.Frame):
         self.product_table.heading("stock", text="Stock")
         self.product_table.heading("tracked", text="Tracked")
 
-        self.product_table.column("id", width=60, anchor=tk.CENTER)
-        self.product_table.column("name", width=280)
-        self.product_table.column("barcode", width=180)
-        self.product_table.column("original_price", width=120, anchor=tk.E)
-        self.product_table.column("sell_price", width=120, anchor=tk.E)
-        self.product_table.column("stock", width=90, anchor=tk.CENTER)
-        self.product_table.column("tracked", width=90, anchor=tk.CENTER)
+        self.product_table.column("id", width=45, anchor=tk.CENTER)
+        self.product_table.column("name", width=160, anchor=tk.W)
+        self.product_table.column("barcode", width=100, anchor=tk.W)
+        self.product_table.column("original_price", width=75, anchor=tk.E)
+        self.product_table.column("sell_price", width=75, anchor=tk.E)
+        self.product_table.column("stock", width=60, anchor=tk.CENTER)
+        self.product_table.column("tracked", width=60, anchor=tk.CENTER)
         self.product_table.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
 
         scrollbar = ttk.Scrollbar(table_box, orient=tk.VERTICAL, command=self.product_table.yview)
@@ -91,9 +97,9 @@ class InventoryFrame(ttk.Frame):
             activebackground=color,
             activeforeground="white",
             relief=tk.FLAT,
-            padx=16,
-            pady=8,
-            font=("Segoe UI", 13, "bold"),
+            padx=self.theme.button_padding_x,
+            pady=self.theme.button_padding_y,
+            font=("Segoe UI", self.theme.body_medium, "bold"),
             cursor="hand2",
         )
 
@@ -103,8 +109,18 @@ class InventoryFrame(ttk.Frame):
         modal.geometry(f"{width}x{height}")
         modal.resizable(False, False)
         modal.transient(self.winfo_toplevel())
-        modal.grab_set()
+        modal.update_idletasks()
+        modal.lift()
+        modal.focus_force()
+        try:
+            modal.attributes("-topmost", True)
+            modal.after_idle(lambda: modal.attributes("-topmost", False))
+        except tk.TclError:
+            pass
         self._center_modal(modal, width, height)
+        modal.lift()
+        modal.wait_visibility()
+        modal.grab_set()
         return modal
 
     def _center_modal(self, modal: tk.Toplevel, width: int, height: int) -> None:
@@ -383,7 +399,12 @@ class InventoryFrame(ttk.Frame):
             ):
                 return
 
-            inventory.delete_product(product["id"])
+            try:
+                inventory.delete_product(product["id"])
+            except ValueError as exc:
+                messagebox.showerror("Cannot delete product", str(exc), parent=modal)
+                return
+
             modal.destroy()
             self.selected_product_id = None
             self.refresh_products(self.search_var.get())
