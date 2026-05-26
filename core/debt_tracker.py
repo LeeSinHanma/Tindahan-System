@@ -1,4 +1,6 @@
 from db.database import get_connection
+from datetime import datetime
+
 
 
 def add_debt(person_name: str, amount: float, description: str = "") -> bool:
@@ -126,6 +128,14 @@ def update_debt(debt_id: int, amount: float, description: str = "") -> bool:
 def mark_paid(debt_id: int) -> bool:
     """Mark a debt as paid."""
     with get_connection() as conn:
+        row = conn.execute(
+            "SELECT amount FROM debt_tracker WHERE id = ? AND is_paid = 0",
+            (debt_id,),
+        ).fetchone()
+        if not row:
+            return False
+        amount = float(row["amount"])
+
         conn.execute(
             """
             UPDATE debt_tracker
@@ -134,8 +144,14 @@ def mark_paid(debt_id: int) -> bool:
             """,
             (debt_id,),
         )
+        # Record a sale for the debt payment
+        conn.execute(
+            "INSERT INTO sales (total, date) VALUES (?, ?)",
+            (amount, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        )
         conn.commit()
     return True
+
 
 
 def mark_unpaid(debt_id: int) -> bool:
@@ -236,4 +252,13 @@ def apply_payment_to_customer(person_name: str, payment_amount: float) -> dict:
                 remaining = 0.0
 
     applied = float(round(payment_amount - remaining, 2))
+    if applied > 0:
+        with get_connection() as conn:
+            conn.execute(
+                "INSERT INTO sales (total, date) VALUES (?, ?)",
+                (applied, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            )
+            conn.commit()
+
     return {"applied": applied, "remaining": float(round(remaining, 2)), "details": details}
+
