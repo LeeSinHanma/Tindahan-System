@@ -284,6 +284,9 @@ class App:
         self.active_screen = screen_name
         frame = self.frames[screen_name]
         frame.tkraise()
+
+        # Drop focus from any nav button or stale widget before restoring screen-specific focus.
+        self.root.focus_set()
         
         # Clear login form when returning to login screen
         if screen_name == "login" and hasattr(frame, "clear_fields"):
