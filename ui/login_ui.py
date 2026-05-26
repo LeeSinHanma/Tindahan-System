@@ -136,9 +136,10 @@ class LoginFrame(ttk.Frame):
 
         self.username_entry.focus_set()
 
-        # keyboard bindings
-        self.bind_all('<Return>', lambda e: self._submit())
-        self.bind_all('<Escape>', lambda e: self._cancel())
+        # keyboard bindings scoped to the login form only
+        self.username_entry.bind('<Return>', lambda e: self._submit())
+        self.password_entry.bind('<Return>', lambda e: self._submit())
+        self.bind('<Escape>', lambda e: self._cancel())
 
     def _on_keep_signed_in_toggle(self) -> None:
         """Show verification dialog when Keep Me Signed In is toggled on."""

@@ -230,12 +230,26 @@ class InventoryFrame(ttk.Frame):
         self._field_row(content, "Name", self._create_vars["name"], 2)
         self._field_row(content, "Description", self._create_vars["description"], 3)
         self._field_row(content, "Barcode", self._create_vars["barcode"], 4)
-        self._field_row(content, "Original Price", self._create_vars["original_price"], 5)
-        self._field_row(content, "Sell Price", self._create_vars["sell_price"], 6)
-        self._field_row(content, "Stock", self._create_vars["stock"], 7)
+
+        # Original Price field + suggested hint
+        ttk.Label(content, text="Original Price").grid(row=5, column=0, sticky="w", pady=6, padx=(0, 10))
+        orig_entry = ttk.Entry(content, textvariable=self._create_vars["original_price"])
+        orig_entry.grid(row=5, column=1, sticky="ew", pady=6)
+        self._create_suggest_orig = ttk.Label(content, text="", font=("Segoe UI", 9, "italic"))
+        self._create_suggest_orig.grid(row=6, column=0, columnspan=2, sticky="w")
+
+        # Sell Price field + suggested hint
+        ttk.Label(content, text="Sell Price").grid(row=7, column=0, sticky="w", pady=6, padx=(0, 10))
+        sell_entry = ttk.Entry(content, textvariable=self._create_vars["sell_price"])
+        sell_entry.grid(row=7, column=1, sticky="ew", pady=6)
+        self._create_suggest_sell = ttk.Label(content, text="", font=("Segoe UI", 9, "italic"))
+        self._create_suggest_sell.grid(row=8, column=0, columnspan=2, sticky="w")
+
+        # Stock field moved down
+        self._field_row(content, "Stock", self._create_vars["stock"], 9)
 
         tracking_row = ttk.Frame(content)
-        tracking_row.grid(row=8, column=0, columnspan=2, sticky="w", pady=(4, 8))
+        tracking_row.grid(row=10, column=0, columnspan=2, sticky="w", pady=(4, 8))
         ttk.Checkbutton(
             tracking_row,
             text="Track stock for this product",
@@ -248,7 +262,7 @@ class InventoryFrame(ttk.Frame):
         ).pack(anchor="w", pady=(2, 0))
 
         button_row = ttk.Frame(content)
-        button_row.grid(row=9, column=0, columnspan=2, sticky="e", pady=(18, 0))
+        button_row.grid(row=11, column=0, columnspan=2, sticky="e", pady=(18, 0))
 
         def submit() -> None:
             try:
@@ -263,6 +277,32 @@ class InventoryFrame(ttk.Frame):
 
         tk.Button(button_row, text="Cancel", command=modal.destroy, bg="#64748b", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT, padx=(8, 0))
         tk.Button(button_row, text="Add", command=submit, bg="#16a34a", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT)
+
+        # Suggestion logic: 20% markup (sell = orig * 1.2); vice versa orig = sell / 1.2
+        def _safe_float(val: str) -> float | None:
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return None
+
+        def _update_create_suggestions(*_args) -> None:
+            orig = _safe_float(self._create_vars["original_price"].get())
+            sell = _safe_float(self._create_vars["sell_price"].get())
+
+            if orig is not None and (sell is None or sell == 0):
+                suggested = orig * 1.2
+                self._create_suggest_sell.config(text=f"Suggested sell price: {suggested:.2f} (20% markup)")
+            else:
+                self._create_suggest_sell.config(text="")
+
+            if sell is not None and (orig is None or orig == 0):
+                suggested_orig = sell / 1.2
+                self._create_suggest_orig.config(text=f"Suggested original price: {suggested_orig:.2f} (≈ sell/1.2)")
+            else:
+                self._create_suggest_orig.config(text="")
+
+        self._create_vars["original_price"].trace_add("write", _update_create_suggestions)
+        self._create_vars["sell_price"].trace_add("write", _update_create_suggestions)
 
     def _open_update_modal(self, _event: tk.Event | None = None) -> None:
         product = self._selected_product()
@@ -293,12 +333,26 @@ class InventoryFrame(ttk.Frame):
         self._field_row(content, "Name", vars_map["name"], 2)
         self._field_row(content, "Description", vars_map["description"], 3)
         self._field_row(content, "Barcode", vars_map["barcode"], 4)
-        self._field_row(content, "Original Price", vars_map["original_price"], 5)
-        self._field_row(content, "Sell Price", vars_map["sell_price"], 6)
-        self._field_row(content, "Stock", vars_map["stock"], 7)
+
+        # Original Price + suggestion
+        ttk.Label(content, text="Original Price").grid(row=5, column=0, sticky="w", pady=6, padx=(0, 10))
+        orig_entry = ttk.Entry(content, textvariable=vars_map["original_price"])
+        orig_entry.grid(row=5, column=1, sticky="ew", pady=6)
+        self._update_suggest_orig = ttk.Label(content, text="", font=("Segoe UI", 9, "italic"))
+        self._update_suggest_orig.grid(row=6, column=0, columnspan=2, sticky="w")
+
+        # Sell Price + suggestion
+        ttk.Label(content, text="Sell Price").grid(row=7, column=0, sticky="w", pady=6, padx=(0, 10))
+        sell_entry = ttk.Entry(content, textvariable=vars_map["sell_price"])
+        sell_entry.grid(row=7, column=1, sticky="ew", pady=6)
+        self._update_suggest_sell = ttk.Label(content, text="", font=("Segoe UI", 9, "italic"))
+        self._update_suggest_sell.grid(row=8, column=0, columnspan=2, sticky="w")
+
+        # Stock field moved down
+        self._field_row(content, "Stock", vars_map["stock"], 9)
 
         tracking_row = ttk.Frame(content)
-        tracking_row.grid(row=8, column=0, columnspan=2, sticky="w", pady=(4, 8))
+        tracking_row.grid(row=10, column=0, columnspan=2, sticky="w", pady=(4, 8))
         ttk.Checkbutton(
             tracking_row,
             text="Track stock for this product",
@@ -311,7 +365,7 @@ class InventoryFrame(ttk.Frame):
         ).pack(anchor="w", pady=(2, 0))
 
         stock_buttons = ttk.Frame(content)
-        stock_buttons.grid(row=9, column=0, columnspan=2, sticky="w", pady=(6, 10))
+        stock_buttons.grid(row=11, column=0, columnspan=2, sticky="w", pady=(6, 10))
 
         def add_stock() -> None:
             try:
@@ -338,7 +392,7 @@ class InventoryFrame(ttk.Frame):
         tk.Button(stock_buttons, text="Clear Stock", command=clear_stock, bg="#475569", fg="white", relief=tk.FLAT, padx=14, pady=8, font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT, padx=(8, 0))
 
         button_row = ttk.Frame(content)
-        button_row.grid(row=10, column=0, columnspan=2, sticky="e", pady=(18, 0))
+        button_row.grid(row=12, column=0, columnspan=2, sticky="e", pady=(18, 0))
 
         def submit() -> None:
             if not messagebox.askyesno(
@@ -360,6 +414,32 @@ class InventoryFrame(ttk.Frame):
 
         tk.Button(button_row, text="Cancel", command=modal.destroy, bg="#64748b", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT, padx=(8, 0))
         tk.Button(button_row, text="Update", command=submit, bg="#f59e0b", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT)
+
+        # Suggestion logic for update modal
+        def _safe_float_update(val: str) -> float | None:
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return None
+
+        def _update_update_suggestions(*_args) -> None:
+            orig = _safe_float_update(vars_map["original_price"].get())
+            sell = _safe_float_update(vars_map["sell_price"].get())
+
+            if orig is not None and (sell is None or sell == 0):
+                suggested = orig * 1.2
+                self._update_suggest_sell.config(text=f"Suggested sell price: {suggested:.2f} (20% markup)")
+            else:
+                self._update_suggest_sell.config(text="")
+
+            if sell is not None and (orig is None or orig == 0):
+                suggested_orig = sell / 1.2
+                self._update_suggest_orig.config(text=f"Suggested original price: {suggested_orig:.2f} (≈ sell/1.2)")
+            else:
+                self._update_suggest_orig.config(text="")
+
+        vars_map["original_price"].trace_add("write", _update_update_suggestions)
+        vars_map["sell_price"].trace_add("write", _update_update_suggestions)
 
     def _open_delete_modal(self) -> None:
         product = self._selected_product()
