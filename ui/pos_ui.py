@@ -1,4 +1,7 @@
 from datetime import datetime
+import os
+import threading
+from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -32,6 +35,7 @@ class POSFrame(ttk.Frame):
         self._build_ui()
         self.after(100, self.focus_barcode)
         top_level.bind("<F1>", self._on_quick_access_hotkey, add="+")
+        top_level.bind("<Shift-Return>", self._on_checkout_hotkey, add="+")
 
     def _configure_styles(self) -> None:
         style = ttk.Style(self)
@@ -73,6 +77,7 @@ class POSFrame(ttk.Frame):
         self.barcode_entry = ttk.Entry(scan_box, textvariable=self.barcode_var, font=("Consolas", self.theme.monospace_medium))
         self.barcode_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
         self.barcode_entry.bind("<Return>", self._on_scan_enter)
+        self.barcode_entry.bind("<Shift-Return>", self._on_checkout_hotkey)
 
         search_box = ttk.LabelFrame(self, text="Search Products", padding=card_padding)
         search_box.pack(fill=tk.X, pady=(0, self.theme.gap_medium))
@@ -136,8 +141,13 @@ class POSFrame(ttk.Frame):
         self.cart_table.bind("<<TreeviewSelect>>", self._on_table_select)
         self.cart_table.bind("<Double-1>", self._double_click_add_qty)
 
+        total_row = ttk.Frame(self)
+        total_row.pack(fill=tk.X, pady=(self.theme.gap_medium, 0))
+        ttk.Label(total_row, text="Current Total:", style="POSMetricLabel.TLabel").pack(side=tk.LEFT)
+        ttk.Label(total_row, textvariable=self.total_var, style="POSMetricValue.TLabel").pack(side=tk.LEFT, padx=(8, 0))
+
         actions = ttk.Frame(self)
-        actions.pack(fill=tk.X, pady=(self.theme.gap_medium, self.theme.gap_small))
+        actions.pack(fill=tk.X, pady=(self.theme.gap_small, self.theme.gap_small))
 
         qty_tools = ttk.Frame(actions)
         qty_tools.pack(side=tk.LEFT)
@@ -192,6 +202,18 @@ class POSFrame(ttk.Frame):
             return "break"
 
         self._open_quick_access_modal()
+        return "break"
+
+    def _on_checkout_hotkey(self, _event: tk.Event | None = None) -> str:
+        focus_widget = self.focus_get()
+        if focus_widget is None:
+            return "break"
+
+        focus_path = str(focus_widget)
+        if not focus_path.startswith(str(self)):
+            return "break"
+
+        self._checkout()
         return "break"
 
     def _open_quick_access_modal(self) -> None:
@@ -611,6 +633,8 @@ class POSFrame(ttk.Frame):
             payment_result["change"] = amount_value - total
             modal.destroy()
 
+        modal.bind("<Return>", lambda _event: submit_payment())
+
         tk.Button(
             button_row,
             text="Cancel",
@@ -689,6 +713,8 @@ class POSFrame(ttk.Frame):
             self.focus_barcode()
             return
 
+        self._play_checkout_sound()
+
         self.cart.clear()
         self.selected_product_id = None
         self._render_cart()
@@ -696,6 +722,28 @@ class POSFrame(ttk.Frame):
             f"Sale complete. ID: {sale_id} | Paid: PHP {amount_given:.2f} | Change: PHP {change:.2f}"
         )
         self.focus_barcode()
+
+    def _play_checkout_sound(self) -> None:
+        sound_path = Path(__file__).resolve().parents[1] / "assets" / "sounds" / "checkout.mp3"
+        if os.name != "nt" or not sound_path.exists():
+            return
+
+        def play_sound() -> None:
+            try:
+                import ctypes
+
+                alias = f"checkout_sound_{threading.get_ident()}"
+                mci_send_string = ctypes.windll.winmm.mciSendStringW
+                open_command = f'open "{sound_path}" type mpegvideo alias {alias}'
+                mci_send_string(open_command, None, 0, None)
+                try:
+                    mci_send_string(f"play {alias} wait", None, 0, None)
+                finally:
+                    mci_send_string(f"close {alias}", None, 0, None)
+            except Exception:
+                return
+
+        threading.Thread(target=play_sound, daemon=True).start()
 
     def _checkout_debt(self) -> None:
         items = self.cart.get_items()
