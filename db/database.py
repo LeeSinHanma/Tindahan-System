@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -192,6 +193,10 @@ def init_database() -> None:
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
             ("low_stock_threshold", "10"),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
+            ("quick_access_product_ids", "[]"),
         )
 
         conn.commit()
@@ -678,6 +683,44 @@ def set_setting(key: str, value: str | int) -> None:
 
 def get_low_stock_threshold() -> int:
     return int(get_setting("low_stock_threshold", 10))
+
+
+def get_quick_access_product_ids() -> list[int]:
+    raw_value = get_setting("quick_access_product_ids", "[]")
+    if isinstance(raw_value, int):
+        raw_value = str(raw_value)
+
+    try:
+        parsed_value = json.loads(raw_value)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+
+    if not isinstance(parsed_value, list):
+        return []
+
+    product_ids: list[int] = []
+    for item in parsed_value:
+        try:
+            product_ids.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return product_ids
+
+
+def set_quick_access_product_ids(product_ids: list[int]) -> None:
+    unique_ids: list[int] = []
+    seen_ids: set[int] = set()
+    for item in product_ids:
+        try:
+            product_id = int(item)
+        except (TypeError, ValueError):
+            continue
+        if product_id in seen_ids:
+            continue
+        seen_ids.add(product_id)
+        unique_ids.append(product_id)
+
+    set_setting("quick_access_product_ids", json.dumps(unique_ids))
 
 
 def list_shopping_list_items(include_done: bool = True) -> list[dict]:

@@ -494,30 +494,181 @@ class InventoryFrame(ttk.Frame):
         tk.Button(button_row, text="Confirm", command=confirm_delete, bg="#dc2626", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT)
 
     def _open_settings_modal(self) -> None:
-        modal = self._open_modal_shell("Inventory Settings", 480, 280)
+        modal = self._open_modal_shell("Inventory Settings", 980, 650)
         content = ttk.Frame(modal, padding=16)
         content.pack(fill=tk.BOTH, expand=True)
+        content.columnconfigure(0, weight=1)
+        content.rowconfigure(2, weight=1)
 
-        ttk.Label(content, text="Inventory Settings", font=("Segoe UI", 15, "bold")).grid(row=0, column=0, columnspan=2, sticky="w")
-        ttk.Label(content, text="Configure how inventory is monitored and managed.", font=("Segoe UI", 12)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 12))
-
-        current_threshold = inventory.get_low_stock_threshold()
-        threshold_var = tk.StringVar(value=str(current_threshold))
-
-        content.columnconfigure(1, weight=1)
-        ttk.Label(content, text="Low Stock Threshold:").grid(row=2, column=0, sticky="w", pady=6, padx=(0, 10))
-        threshold_entry = ttk.Entry(content, textvariable=threshold_var)
-        threshold_entry.grid(row=2, column=1, sticky="ew", pady=6)
-
+        ttk.Label(content, text="Inventory Settings", font=("Segoe UI", 15, "bold")).grid(row=0, column=0, sticky="w")
         ttk.Label(
             content,
+            text="Configure low stock monitoring and choose which products appear in POS quick access.",
+            font=("Segoe UI", 12),
+        ).grid(row=1, column=0, sticky="w", pady=(4, 12))
+
+        threshold_frame = ttk.LabelFrame(content, text="Low Stock Threshold", padding=12)
+        threshold_frame.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+        threshold_frame.columnconfigure(1, weight=1)
+
+        threshold_var = tk.StringVar(value=str(inventory.get_low_stock_threshold()))
+        ttk.Label(threshold_frame, text="Threshold:").grid(row=0, column=0, sticky="w", padx=(0, 10))
+        threshold_entry = ttk.Entry(threshold_frame, textvariable=threshold_var, width=12)
+        threshold_entry.grid(row=0, column=1, sticky="w")
+        ttk.Label(
+            threshold_frame,
             text="Products with stock at or below this number will be flagged as low stock.",
             font=("Segoe UI", 10),
             foreground="#64748b",
-        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(2, 12))
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
-        button_row = ttk.Frame(content)
-        button_row.grid(row=4, column=0, columnspan=2, sticky="e", pady=(18, 0))
+        quick_area = ttk.Frame(content)
+        quick_area.grid(row=3, column=0, sticky="nsew")
+        quick_area.columnconfigure(0, weight=3)
+        quick_area.columnconfigure(1, weight=2)
+        quick_area.rowconfigure(1, weight=1)
+
+        search_frame = ttk.Frame(quick_area)
+        search_frame.grid(row=0, column=0, sticky="ew", padx=(0, 8), pady=(0, 8))
+        search_frame.columnconfigure(1, weight=1)
+        ttk.Label(search_frame, text="Search items:", font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
+        search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_frame, textvariable=search_var, font=("Segoe UI", 12))
+        search_entry.grid(row=0, column=1, sticky="ew", padx=(10, 8))
+
+        quick_status_var = tk.StringVar(value="Select an item and press Quicklist to add it to the quick access list.")
+        ttk.Label(search_frame, textvariable=quick_status_var, foreground="#64748b").grid(
+            row=1, column=0, columnspan=3, sticky="w", pady=(6, 0)
+        )
+
+        item_panel = ttk.Frame(quick_area)
+        item_panel.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
+        item_panel.columnconfigure(0, weight=1)
+        item_panel.rowconfigure(0, weight=1)
+
+        item_columns = ("name", "price", "stock")
+        item_tree = ttk.Treeview(item_panel, columns=item_columns, show="headings", height=14)
+        item_tree.heading("name", text="Name")
+        item_tree.heading("price", text="Price")
+        item_tree.heading("stock", text="Stock")
+        item_tree.column("name", width=320, anchor=tk.W)
+        item_tree.column("price", width=100, anchor=tk.E)
+        item_tree.column("stock", width=80, anchor=tk.CENTER)
+        item_tree.grid(row=0, column=0, sticky="nsew")
+
+        item_scroll = ttk.Scrollbar(item_panel, orient=tk.VERTICAL, command=item_tree.yview)
+        item_scroll.grid(row=0, column=1, sticky="ns")
+        item_tree.configure(yscrollcommand=item_scroll.set)
+
+        quick_panel = ttk.Frame(quick_area)
+        quick_panel.grid(row=0, column=1, rowspan=2, sticky="nsew")
+        quick_panel.columnconfigure(0, weight=1)
+        quick_panel.rowconfigure(1, weight=1)
+
+        ttk.Label(quick_panel, text="Quick Access List", font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
+
+        quick_list_frame = ttk.Frame(quick_panel)
+        quick_list_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        quick_list_frame.columnconfigure(0, weight=1)
+        quick_list_frame.rowconfigure(0, weight=1)
+
+        quick_columns = ("name", "price", "stock")
+        quick_tree = ttk.Treeview(quick_list_frame, columns=quick_columns, show="headings", height=14)
+        quick_tree.heading("name", text="Name")
+        quick_tree.heading("price", text="Price")
+        quick_tree.heading("stock", text="Stock")
+        quick_tree.column("name", width=220, anchor=tk.W)
+        quick_tree.column("price", width=90, anchor=tk.E)
+        quick_tree.column("stock", width=70, anchor=tk.CENTER)
+        quick_tree.grid(row=0, column=0, sticky="nsew")
+
+        quick_scroll = ttk.Scrollbar(quick_list_frame, orient=tk.VERTICAL, command=quick_tree.yview)
+        quick_scroll.grid(row=0, column=1, sticky="ns")
+        quick_tree.configure(yscrollcommand=quick_scroll.set)
+
+        quick_button_row = ttk.Frame(quick_panel)
+        quick_button_row.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+
+        current_quick_ids = []
+        for product_id in inventory.get_quick_access_product_ids():
+            if inventory.get_product_by_id(product_id) is not None and product_id not in current_quick_ids:
+                current_quick_ids.append(product_id)
+
+        product_lookup: dict[int, dict] = {}
+
+        def refresh_items(search_term: str = "") -> None:
+            for row_id in item_tree.get_children():
+                item_tree.delete(row_id)
+
+            product_lookup.clear()
+            products = inventory.search_products(search_term) if search_term else inventory.list_products()
+            for product in products:
+                product_lookup[product["id"]] = product
+                item_tree.insert(
+                    "",
+                    tk.END,
+                    iid=str(product["id"]),
+                    values=(
+                        product["name"],
+                        f"{product['sell_price']:.2f}",
+                        product["stock"],
+                    ),
+                )
+
+        def refresh_quick_list() -> None:
+            for row_id in quick_tree.get_children():
+                quick_tree.delete(row_id)
+
+            sanitized_ids: list[int] = []
+            for product_id in current_quick_ids:
+                product = inventory.get_product_by_id(product_id)
+                if product is None or product_id in sanitized_ids:
+                    continue
+                sanitized_ids.append(product_id)
+                quick_tree.insert(
+                    "",
+                    tk.END,
+                    iid=str(product_id),
+                    values=(
+                        product["name"],
+                        f"{product['sell_price']:.2f}",
+                        product["stock"],
+                    ),
+                )
+
+            current_quick_ids[:] = sanitized_ids
+
+        def add_selected_to_quicklist() -> None:
+            selected = item_tree.selection()
+            if not selected:
+                messagebox.showerror("Invalid input", "Select an item first", parent=modal)
+                return
+
+            product_id = int(selected[0])
+            if product_id in current_quick_ids:
+                quick_status_var.set("That item is already in the quick access list.")
+                return
+
+            product = product_lookup.get(product_id)
+            if product is None:
+                messagebox.showerror("Invalid input", "Selected item not found", parent=modal)
+                return
+
+            current_quick_ids.append(product_id)
+            refresh_quick_list()
+            quick_status_var.set(f"Added to quick access: {product['name']}")
+
+        def remove_selected_from_quicklist() -> None:
+            selected = quick_tree.selection()
+            if not selected:
+                messagebox.showerror("Invalid input", "Select a quick access item first", parent=modal)
+                return
+
+            product_id = int(selected[0])
+            if product_id in current_quick_ids:
+                current_quick_ids.remove(product_id)
+                refresh_quick_list()
+                quick_status_var.set("Removed from quick access list.")
 
         def submit() -> None:
             try:
@@ -525,13 +676,79 @@ class InventoryFrame(ttk.Frame):
                 if threshold_value < 0:
                     raise ValueError
             except ValueError:
-                messagebox.showerror("Validation error", "Low stock threshold must be a whole number of 0 or more.", parent=modal)
+                messagebox.showerror(
+                    "Validation error",
+                    "Low stock threshold must be a whole number of 0 or more.",
+                    parent=modal,
+                )
                 return
 
             inventory.set_low_stock_threshold(threshold_value)
+            inventory.set_quick_access_product_ids(current_quick_ids)
             modal.destroy()
             self.refresh_products()
-            self.status_var.set(f"Settings saved: Low stock threshold set to {threshold_value}")
+            self.status_var.set(
+                f"Settings saved: Low stock threshold set to {threshold_value} and {len(current_quick_ids)} quick items saved"
+            )
 
-        tk.Button(button_row, text="Cancel", command=modal.destroy, bg="#64748b", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT, padx=(8, 0))
-        tk.Button(button_row, text="Save", command=submit, bg="#a855f7", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT)
+        search_var.trace_add("write", lambda *_args: refresh_items(search_var.get().strip()))
+        search_entry.bind("<Return>", lambda _event: refresh_items(search_var.get().strip()))
+        item_tree.bind("<Double-1>", lambda _event: add_selected_to_quicklist())
+        quick_tree.bind("<Delete>", lambda _event: remove_selected_from_quicklist())
+
+        quicklist_button = tk.Button(
+            quick_button_row,
+            text="Quicklist",
+            command=add_selected_to_quicklist,
+            bg="#4f46e5",
+            fg="white",
+            relief=tk.FLAT,
+            padx=14,
+            pady=6,
+            font=("Segoe UI", 11, "bold"),
+            cursor="hand2",
+        )
+        quicklist_button.pack(side=tk.LEFT)
+
+        tk.Button(
+            quick_button_row,
+            text="Remove",
+            command=remove_selected_from_quicklist,
+            bg="#64748b",
+            fg="white",
+            relief=tk.FLAT,
+            padx=14,
+            pady=6,
+            font=("Segoe UI", 11, "bold"),
+            cursor="hand2",
+        ).pack(side=tk.LEFT, padx=(8, 0))
+
+        button_row = ttk.Frame(content)
+        button_row.grid(row=4, column=0, sticky="e", pady=(18, 0))
+
+        tk.Button(
+            button_row,
+            text="Cancel",
+            command=modal.destroy,
+            bg="#64748b",
+            fg="white",
+            relief=tk.FLAT,
+            padx=18,
+            pady=8,
+            font=("Segoe UI", 12, "bold"),
+        ).pack(side=tk.RIGHT, padx=(8, 0))
+        tk.Button(
+            button_row,
+            text="Save",
+            command=submit,
+            bg="#a855f7",
+            fg="white",
+            relief=tk.FLAT,
+            padx=18,
+            pady=8,
+            font=("Segoe UI", 12, "bold"),
+        ).pack(side=tk.RIGHT)
+
+        refresh_items()
+        refresh_quick_list()
+        search_entry.focus_set()

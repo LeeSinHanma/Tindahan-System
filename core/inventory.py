@@ -11,6 +11,23 @@ def set_low_stock_threshold(threshold: int) -> None:
     database.set_setting("low_stock_threshold", threshold)
 
 
+def get_quick_access_product_ids() -> list[int]:
+    return database.get_quick_access_product_ids()
+
+
+def set_quick_access_product_ids(product_ids: list[int]) -> None:
+    database.set_quick_access_product_ids(product_ids)
+
+
+def get_quick_access_products() -> list[dict]:
+    products: list[dict] = []
+    for product_id in get_quick_access_product_ids():
+        product = get_product_by_id(product_id)
+        if product is not None:
+            products.append(product)
+    return products
+
+
 
 
 def _clean_text(value: str | None) -> str:
