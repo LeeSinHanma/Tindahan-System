@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from core.cart import Cart
-from core.inventory import get_product_by_barcode, search_products
+from core.inventory import get_product_by_barcode, get_quick_access_products, search_products
 from core.sales import complete_sale
 from core import debt_tracker
 from .theme_manager import ThemeManager
@@ -26,10 +26,12 @@ class POSFrame(ttk.Frame):
         self.total_var = tk.StringVar(value="Total: PHP 0.00")
         self.items_count_var = tk.StringVar(value="Items: 0")
         self.status_var = tk.StringVar(value="Ready: scan a barcode")
+        self.quick_access_modal: tk.Toplevel | None = None
 
         self._configure_styles()
         self._build_ui()
         self.after(100, self.focus_barcode)
+        top_level.bind("<F1>", self._on_quick_access_hotkey, add="+")
 
     def _configure_styles(self) -> None:
         style = ttk.Style(self)
@@ -180,6 +182,147 @@ class POSFrame(ttk.Frame):
         self.barcode_entry.focus_set()
         self.barcode_entry.icursor(tk.END)
 
+    def _on_quick_access_hotkey(self, _event: tk.Event | None = None) -> str:
+        focus_widget = self.focus_get()
+        if focus_widget is None:
+            return "break"
+
+        focus_path = str(focus_widget)
+        if not focus_path.startswith(str(self)):
+            return "break"
+
+        self._open_quick_access_modal()
+        return "break"
+
+    def _open_quick_access_modal(self) -> None:
+        if self.quick_access_modal is not None and self.quick_access_modal.winfo_exists():
+            self.quick_access_modal.lift()
+            self.quick_access_modal.focus_force()
+            return
+
+        modal = tk.Toplevel(self)
+        self.quick_access_modal = modal
+        modal.title("Quick Access Items")
+        width, height = 560, 380
+        modal.geometry(f"{width}x{height}")
+        modal.resizable(False, False)
+        modal.transient(self.winfo_toplevel())
+        modal.update_idletasks()
+        modal.lift()
+        modal.focus_force()
+        try:
+            modal.attributes("-topmost", True)
+            modal.after_idle(lambda: modal.attributes("-topmost", False))
+        except tk.TclError:
+            pass
+        self._center_modal(modal, width, height)
+        modal.lift()
+        modal.wait_visibility()
+        modal.grab_set()
+
+        def close_modal() -> None:
+            if self.quick_access_modal is modal:
+                self.quick_access_modal = None
+            modal.destroy()
+
+        modal.protocol("WM_DELETE_WINDOW", close_modal)
+
+        content = ttk.Frame(modal, padding=16)
+        content.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(content, text="Quick Access Items", font=("Segoe UI", 13, "bold")).pack(anchor="w")
+        ttk.Label(
+            content,
+            text="Pick an item, then use Add to Cart to send it into the cart.",
+            wraplength=520,
+        ).pack(anchor="w", pady=(4, 12))
+
+        button_row = ttk.Frame(content)
+        button_row.pack(fill=tk.X, pady=(0, 10))
+
+        items_box = ttk.Frame(content)
+        items_box.pack(fill=tk.BOTH, expand=True)
+
+        quick_access_products = get_quick_access_products()
+        quick_access_lookup = {item["id"]: item for item in quick_access_products}
+
+        quick_columns = ("name", "price", "stock")
+        quick_table = ttk.Treeview(items_box, columns=quick_columns, show="headings", height=10)
+        quick_table.heading("name", text="Name")
+        quick_table.heading("price", text="Price")
+        quick_table.heading("stock", text="Stock")
+        quick_table.column("name", width=280, anchor=tk.W)
+        quick_table.column("price", width=100, anchor=tk.E)
+        quick_table.column("stock", width=80, anchor=tk.CENTER)
+        quick_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        quick_scroll = ttk.Scrollbar(items_box, orient=tk.VERTICAL, command=quick_table.yview)
+        quick_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        quick_table.configure(yscrollcommand=quick_scroll.set)
+
+        for product in quick_access_products:
+            quick_table.insert(
+                "",
+                tk.END,
+                iid=str(product["id"]),
+                values=(
+                    product["name"],
+                    f"PHP {product['sell_price']:.2f}",
+                    product["stock"],
+                ),
+            )
+
+        if not quick_access_products:
+            ttk.Label(items_box, text="No quick access items configured yet.").pack(side=tk.LEFT, padx=12, pady=12)
+
+        def add_selected_item() -> None:
+            selected = quick_table.selection()
+            if not selected:
+                messagebox.showerror("Invalid input", "Select a quick access item first", parent=modal)
+                return
+
+            product_id = int(selected[0])
+            product = quick_access_lookup.get(product_id)
+            if product is None:
+                messagebox.showerror("Invalid input", "Selected quick access item not found", parent=modal)
+                return
+
+            if self._add_product_to_cart(product, restore_focus=False):
+                quick_table.focus_set()
+
+        ttk.Button(
+            button_row,
+            text="Add to Cart",
+            command=add_selected_item,
+            style="",
+            width=16,
+        ).pack(side=tk.LEFT)
+
+        ttk.Label(content, text="Press Esc or close this window to return to POS.").pack(anchor="w", pady=(10, 0))
+
+        modal.bind("<Escape>", lambda _event: close_modal())
+        modal.wait_window()
+
+    def _add_product_to_cart(self, product: dict, restore_focus: bool = True) -> bool:
+        if product.get("stock_tracked", False) and product["stock"] <= 0:
+            self.status_var.set(f"Out of stock: {product['name']}")
+            return False
+
+        added = self.cart.add_product(product)
+        if not added:
+            self.status_var.set(f"Stock limit reached: {product['name']}")
+            return False
+
+        if product["stock"] <= 10:
+            self.status_var.set(f"Added: {product['name']} (low stock)")
+        else:
+            self.status_var.set(f"Added: {product['name']}")
+
+        self._render_cart()
+        if restore_focus:
+            self.focus_barcode()
+        return True
+
     def _on_search_enter(self, _event: tk.Event | None = None) -> str:
         self._search_products()
         return "break"
@@ -233,22 +376,7 @@ class POSFrame(ttk.Frame):
             messagebox.showerror("Invalid input", "Selected product not found", parent=self)
             return
 
-        if product.get("stock_tracked", False) and product["stock"] <= 0:
-            self.status_var.set(f"Out of stock: {product['name']}")
-            return
-
-        added = self.cart.add_product(product)
-        if not added:
-            self.status_var.set(f"Stock limit reached: {product['name']}")
-            return
-
-        if product["stock"] <= 10:
-            self.status_var.set(f"Added: {product['name']} (low stock)")
-        else:
-            self.status_var.set(f"Added: {product['name']}")
-
-        self._render_cart()
-        self.focus_barcode()
+        self._add_product_to_cart(product)
 
     def _on_scan_enter(self, _event: tk.Event) -> str:
         barcode = self.barcode_var.get().strip()

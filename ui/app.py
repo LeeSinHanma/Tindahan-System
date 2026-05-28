@@ -178,7 +178,7 @@ class App:
 
         # Logout button
         try:
-            signin_btn = tk.Button(
+            self.signin_btn = tk.Button(
                 self.sidebar,
                 text="Sign In",
                 command=self._handle_signin,
@@ -192,9 +192,9 @@ class App:
                 font=("Segoe UI", 10, "bold"),
                 cursor="hand2",
             )
-            signin_btn.pack(fill=tk.X, padx=16, pady=(0, 8))
+            self.signin_btn.pack(fill=tk.X, padx=16, pady=(0, 8))
 
-            logout_btn = tk.Button(
+            self.logout_btn = tk.Button(
                 self.sidebar,
                 text="Logout",
                 command=self._handle_logout,
@@ -208,9 +208,11 @@ class App:
                 font=("Segoe UI", 10, "bold"),
                 cursor="hand2",
             )
-            logout_btn.pack(fill=tk.X, padx=16, pady=(0, 18))
+            self.logout_btn.pack(fill=tk.X, padx=16, pady=(0, 18))
         except Exception:
             pass
+
+        self._update_auth_controls()
 
     def _add_sidebar_section(self, title: str, pady: tuple[int, int] = (0, 8)) -> None:
         tk.Label(
@@ -314,6 +316,7 @@ class App:
 
         self.current_user = None
         self._sync_user_access()
+        self._update_nav_state()
         # show dedicated login screen (if login cancelled by user, close app)
         self._show_screen("login")
 
@@ -329,6 +332,7 @@ class App:
         except Exception:
             pass
         self._sync_user_access()
+        self._update_nav_state()
         self._show_screen("dashboard")
 
     def _on_login_cancel(self) -> None:
@@ -360,6 +364,7 @@ class App:
                 except Exception:
                     pass
                 self._sync_user_access()
+                self._update_nav_state()
                 self._show_screen("dashboard")
         except Exception:
             pass
@@ -388,6 +393,23 @@ class App:
                     pass
                 del self.frames["users"]
 
+    def _update_auth_controls(self) -> None:
+        is_authenticated = self.current_user is not None
+
+        try:
+            if is_authenticated:
+                if hasattr(self, "signin_btn") and self.signin_btn.winfo_ismapped():
+                    self.signin_btn.pack_forget()
+                if hasattr(self, "logout_btn") and not self.logout_btn.winfo_ismapped():
+                    self.logout_btn.pack(fill=tk.X, padx=16, pady=(0, 18))
+            else:
+                if hasattr(self, "logout_btn") and not self.logout_btn.winfo_ismapped():
+                    self.logout_btn.pack(fill=tk.X, padx=16, pady=(0, 18))
+                if hasattr(self, "signin_btn") and not self.signin_btn.winfo_ismapped():
+                    self.signin_btn.pack(fill=tk.X, padx=16, pady=(0, 8))
+        except Exception:
+            pass
+
     def _refresh_active_screen(self) -> None:
         if self.active_screen == "dashboard":
             self.frames["dashboard"].refresh()
@@ -409,6 +431,7 @@ class App:
 
     def _update_nav_state(self) -> None:
         is_authenticated = self.current_user is not None
+        self._update_auth_controls()
         
         for screen_name, button in self.nav_buttons.items():
             if not is_authenticated:
