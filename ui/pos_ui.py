@@ -1,6 +1,7 @@
 from datetime import datetime
-import os
+import sys
 import threading
+import time
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -724,26 +725,35 @@ class POSFrame(ttk.Frame):
         self.focus_barcode()
 
     def _play_checkout_sound(self) -> None:
-        sound_path = Path(__file__).resolve().parents[1] / "assets" / "sounds" / "checkout.mp3"
-        if os.name != "nt" or not sound_path.exists():
+        sound_path = self._resource_path("assets", "sounds", "checkout.mp3")
+        if not sound_path.exists():
             return
 
         def play_sound() -> None:
             try:
-                import ctypes
+                import pygame
 
-                alias = f"checkout_sound_{threading.get_ident()}"
-                mci_send_string = ctypes.windll.winmm.mciSendStringW
-                open_command = f'open "{sound_path}" type mpegvideo alias {alias}'
-                mci_send_string(open_command, None, 0, None)
-                try:
-                    mci_send_string(f"play {alias} wait", None, 0, None)
-                finally:
-                    mci_send_string(f"close {alias}", None, 0, None)
+                if not pygame.mixer.get_init():
+                    pygame.mixer.init()
+
+                sound = pygame.mixer.Sound(str(sound_path))
+                channel = sound.play()
+                if channel is None:
+                    return
+
+                while channel.get_busy():
+                    time.sleep(0.05)
             except Exception:
                 return
 
         threading.Thread(target=play_sound, daemon=True).start()
+
+    def _resource_path(self, *parts: str) -> Path:
+        if getattr(sys, "frozen", False):
+            base_dir = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        else:
+            base_dir = Path(__file__).resolve().parents[1]
+        return base_dir.joinpath(*parts)
 
     def _checkout_debt(self) -> None:
         items = self.cart.get_items()
