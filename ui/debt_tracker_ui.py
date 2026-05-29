@@ -161,6 +161,7 @@ class DebtTrackerFrame(ttk.Frame):
             pady=self.theme.button_padding_y,
         )
         self.pay_button.grid(row=0, column=2, padx=(8, 0))
+        pay_entry.bind("<Return>", lambda _event: self._pay_amount_for_customer() or "break")
         pay_entry.bind("<KeyRelease>", lambda _event: self._update_pay_button_state())
 
         footer = ttk.Frame(self)
@@ -254,6 +255,14 @@ class DebtTrackerFrame(ttk.Frame):
             messagebox.showerror("Invalid input", "Please enter a valid amount", parent=self)
             return
 
+        confirm = messagebox.askyesno(
+            "Confirm Add Debt",
+            f"Add PHP {amount:.2f} debt for {self.selected_customer}?\n\nDescription: {description or '-'}",
+            parent=self,
+        )
+        if not confirm:
+            return
+
         if debt_tracker.add_debt(self.selected_customer, amount, description):
             self.amount_var.set("")
             self.description_var.set("")
@@ -288,6 +297,21 @@ class DebtTrackerFrame(ttk.Frame):
             self._update_pay_button_state()
             return
 
+        confirm_message = f"Apply PHP {amount:.2f} payment to {self.selected_customer}?"
+        if amount > total_debt:
+            change = amount - total_debt
+            confirm_message = (
+                f"The pay amount is higher than the current debt.\n\n"
+                f"Current debt: PHP {total_debt:.2f}\n"
+                f"Amount given: PHP {amount:.2f}\n"
+                f"Change: PHP {change:.2f}\n\n"
+                "Do you want to continue?"
+            )
+
+        confirm = messagebox.askyesno("Confirm Payment", confirm_message, parent=self)
+        if not confirm:
+            return
+
         summary = debt_tracker.apply_payment_to_customer(self.selected_customer, amount)
         applied = summary.get("applied", 0.0)
         remaining = summary.get("remaining", 0.0)
@@ -296,12 +320,20 @@ class DebtTrackerFrame(ttk.Frame):
             return
 
         self.pay_amount_var.set("")
-        self.status_var.set(f"Applied PHP {applied:.2f} to {self.selected_customer}. Remaining: PHP {remaining:.2f}")
+        if amount > total_debt:
+            self.status_var.set(
+                f"Applied PHP {applied:.2f} to {self.selected_customer}. Change: PHP {remaining:.2f}"
+            )
+        else:
+            self.status_var.set(f"Applied PHP {applied:.2f} to {self.selected_customer}. Remaining: PHP {remaining:.2f}")
         self.refresh()
 
     def _mark_debt_paid(self) -> None:
         if not self.selected_debt_id:
             messagebox.showerror("Invalid input", "Please select a debt to mark as paid", parent=self)
+            return
+
+        if not messagebox.askyesno("Confirm Payment", "Mark this selected debt as paid?", parent=self):
             return
 
         if debt_tracker.mark_paid(self.selected_debt_id):
