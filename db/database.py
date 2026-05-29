@@ -606,22 +606,10 @@ def record_sale(cart_items: list[dict], total: float, date_value: str) -> int:
     if not cart_items:
         raise ValueError("Cart is empty")
 
+    _apply_stock_changes(cart_items)
+
     with get_connection() as conn:
         cursor = conn.cursor()
-
-        for item in cart_items:
-            row = cursor.execute(
-                "SELECT stock, stock_tracked FROM products WHERE id = ?",
-                (item["product_id"],),
-            ).fetchone()
-            if row is None:
-                raise ValueError("Product not found")
-
-            quantity = int(item["quantity"])
-            if int(row["stock_tracked"] or 0) == 1:
-                current_stock = int(row["stock"] or 0)
-                if current_stock < quantity:
-                    raise ValueError(f"Insufficient stock for {item['name']}")
 
         cursor.execute(
             "INSERT INTO sales (total, date) VALUES (?, ?)",
@@ -656,6 +644,43 @@ def record_sale(cart_items: list[dict], total: float, date_value: str) -> int:
 
         conn.commit()
         return sale_id
+
+
+def _apply_stock_changes(cart_items: list[dict]) -> None:
+    if not cart_items:
+        raise ValueError("Cart is empty")
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        for item in cart_items:
+            row = cursor.execute(
+                "SELECT stock, stock_tracked FROM products WHERE id = ?",
+                (item["product_id"],),
+            ).fetchone()
+            if row is None:
+                raise ValueError("Product not found")
+
+            quantity = int(item["quantity"])
+            if int(row["stock_tracked"] or 0) == 1:
+                current_stock = int(row["stock"] or 0)
+                if current_stock < quantity:
+                    raise ValueError(f"Insufficient stock for {item['name']}")
+
+        cursor.executemany(
+            """
+            UPDATE products
+            SET stock = stock - ?
+            WHERE id = ? AND stock_tracked = 1
+            """,
+            [(item["quantity"], item["product_id"]) for item in cart_items],
+        )
+
+        conn.commit()
+
+
+def apply_stock_changes(cart_items: list[dict]) -> None:
+    _apply_stock_changes(cart_items)
 
 
 def get_setting(key: str, default: str | int = "") -> int | str:

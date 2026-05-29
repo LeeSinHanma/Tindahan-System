@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from core.cart import Cart
-from core.inventory import get_product_by_barcode, get_quick_access_products, search_products
+from core.inventory import apply_stock_changes, get_product_by_barcode, get_quick_access_products, search_products
 from core.sales import complete_sale
 from core import debt_tracker
 from .theme_manager import ThemeManager
@@ -762,11 +762,13 @@ class POSFrame(ttk.Frame):
             self.focus_barcode()
             return
 
+        total = self.cart.get_total()
+
         modal = tk.Toplevel(self)
         modal.title("Checkout as Debt")
-        width, height = 700, 420
+        width, height = 860, 560
         modal.geometry(f"{width}x{height}")
-        modal.resizable(False, False)
+        modal.resizable(True, True)
         modal.transient(self.winfo_toplevel())
         modal.update_idletasks()
         modal.lift()
@@ -798,7 +800,7 @@ class POSFrame(ttk.Frame):
         search_entry.pack(fill=tk.X, pady=(6, 4))
 
         cust_columns = ("name", "total", "pending")
-        cust_table = ttk.Treeview(left, columns=cust_columns, show="headings", height=12)
+        cust_table = ttk.Treeview(left, columns=cust_columns, show="headings", height=8)
         cust_table.heading("name", text="Name")
         cust_table.heading("total", text="Total Due")
         cust_table.heading("pending", text="Pending")
@@ -852,7 +854,7 @@ class POSFrame(ttk.Frame):
         cart_box.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
 
         cart_columns = ("name", "qty", "subtotal")
-        debt_items_table = ttk.Treeview(cart_box, columns=cart_columns, show="headings", height=12)
+        debt_items_table = ttk.Treeview(cart_box, columns=cart_columns, show="headings", height=8)
         debt_items_table.heading("name", text="Product")
         debt_items_table.heading("qty", text="Qty")
         debt_items_table.heading("subtotal", text="Amount")
@@ -885,6 +887,12 @@ class POSFrame(ttk.Frame):
             name = selected_customer.get("name") or new_customer_var.get().strip()
             if not name:
                 messagebox.showerror("Invalid input", "Select or enter a customer name", parent=modal)
+                return
+
+            try:
+                apply_stock_changes(items)
+            except ValueError as exc:
+                messagebox.showerror("Invalid input", str(exc), parent=modal)
                 return
 
             # ensure customer exists
