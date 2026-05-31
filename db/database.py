@@ -114,6 +114,7 @@ def init_database() -> None:
                 amount REAL NOT NULL,
                 is_paid INTEGER NOT NULL DEFAULT 0,
                 description TEXT DEFAULT '',
+                sale_linked INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 paid_at TEXT
             )
@@ -121,6 +122,8 @@ def init_database() -> None:
         )
 
         _ensure_column(conn, "debt_tracker", "description", "TEXT DEFAULT ''")
+        _ensure_column(conn, "debt_tracker", "sale_linked", "INTEGER NOT NULL DEFAULT 1")
+        conn.execute("UPDATE debt_tracker SET sale_linked = COALESCE(sale_linked, 1)")
 
         # Customers table to support account-style debt tracking
         conn.execute(
@@ -602,7 +605,41 @@ def get_top_selling_products(limit: int = 5, period_days: int | None = None) -> 
     ]
 
 
-def record_sale(cart_items: list[dict], total: float, date_value: str) -> int:
+def _validate_stock_for_cart_items(cursor: sqlite3.Cursor, cart_items: list[dict]) -> None:
+    for item in cart_items:
+        row = cursor.execute(
+            "SELECT stock, stock_tracked FROM products WHERE id = ?",
+            (item["product_id"],),
+        ).fetchone()
+        if row is None:
+            raise ValueError("Product not found")
+
+        quantity = int(item["quantity"])
+        if int(row["stock_tracked"] or 0) == 1:
+            current_stock = int(row["stock"] or 0)
+            if current_stock < quantity:
+                raise ValueError(f"Insufficient stock for {item['name']}")
+
+
+def reduce_stock_for_cart_items(cart_items: list[dict]) -> None:
+    if not cart_items:
+        return
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _validate_stock_for_cart_items(cursor, cart_items)
+        cursor.executemany(
+            """
+            UPDATE products
+            SET stock = stock - ?
+            WHERE id = ? AND stock_tracked = 1
+            """,
+            [(item["quantity"], item["product_id"]) for item in cart_items],
+        )
+        conn.commit()
+
+
+def validate_cart_item_stock(cart_items: list[dict]) -> None:
     if not cart_items:
         raise ValueError("Cart is empty")
 
@@ -610,6 +647,16 @@ def record_sale(cart_items: list[dict], total: float, date_value: str) -> int:
 
     with get_connection() as conn:
         cursor = conn.cursor()
+        _validate_stock_for_cart_items(cursor, cart_items)
+
+
+def record_sale(cart_items: list[dict], total: float, date_value: str) -> int:
+    if not cart_items:
+        raise ValueError("Cart is empty")
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _validate_stock_for_cart_items(cursor, cart_items)
 
         cursor.execute(
             "INSERT INTO sales (total, date) VALUES (?, ?)",
