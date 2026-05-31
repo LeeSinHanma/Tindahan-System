@@ -48,6 +48,7 @@ class InventoryFrame(ttk.Frame):
         self._create_toolbar_button(toolbar, "Show All", self._show_all, "#64748b").pack(side=tk.LEFT)
         self._create_toolbar_button(toolbar, "Untracked Items", self._show_untracked, "#4f46e5").pack(side=tk.LEFT, padx=(8, 0))
         self._create_toolbar_button(toolbar, "Settings", self._open_settings_modal, "#a855f7").pack(side=tk.LEFT, padx=(8, 0))
+        self._create_toolbar_button(toolbar, "Restock", self._open_restock_modal, "#0ea5e9").pack(side=tk.LEFT, padx=(8, 0))
         self._create_toolbar_button(toolbar, "Create", self._open_create_modal, "#16a34a").pack(side=tk.RIGHT, padx=(8, 0))
         self._create_toolbar_button(toolbar, "Delete", self._open_delete_modal, "#dc2626").pack(side=tk.RIGHT, padx=(8, 0))
         self._create_toolbar_button(toolbar, "Update", self._open_update_modal, "#f59e0b").pack(side=tk.RIGHT, padx=(8, 0))
@@ -440,6 +441,156 @@ class InventoryFrame(ttk.Frame):
 
         vars_map["original_price"].trace_add("write", _update_update_suggestions)
         vars_map["sell_price"].trace_add("write", _update_update_suggestions)
+
+    def _open_restock_modal(self) -> None:
+        modal = self._open_modal_shell("Restock Product", 640, 430)
+        content = ttk.Frame(modal, padding=16)
+        content.pack(fill=tk.BOTH, expand=True)
+        content.columnconfigure(1, weight=1)
+
+        ttk.Label(content, text="Restock Product", font=("Segoe UI", 15, "bold")).grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(
+            content,
+            text="Scan a barcode, review the product, enter the restock quantity, then confirm.",
+            font=("Segoe UI", 12),
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 12))
+
+        barcode_var = tk.StringVar()
+        qty_var = tk.StringVar(value="1")
+        product_summary_var = tk.StringVar(value="Scan a barcode to load a product.")
+        loaded_product: dict | None = None
+
+        ttk.Label(content, text="Barcode").grid(row=2, column=0, sticky="w", pady=6, padx=(0, 10))
+        barcode_entry = ttk.Entry(content, textvariable=barcode_var, font=("Consolas", 12))
+        barcode_entry.grid(row=2, column=1, sticky="ew", pady=6)
+
+        ttk.Label(content, text="Item").grid(row=3, column=0, sticky="nw", pady=(10, 0), padx=(0, 10))
+        summary_box = ttk.LabelFrame(content, text="Scanned Item", padding=10)
+        summary_box.grid(row=3, column=1, sticky="ew", pady=(10, 0))
+        summary_box.columnconfigure(0, weight=1)
+        ttk.Label(summary_box, textvariable=product_summary_var, wraplength=430, justify=tk.LEFT).grid(row=0, column=0, sticky="w")
+
+        ttk.Label(content, text="Quantity").grid(row=4, column=0, sticky="w", pady=6, padx=(0, 10))
+        qty_entry = ttk.Entry(content, textvariable=qty_var, width=10)
+        qty_entry.grid(row=4, column=1, sticky="w", pady=6)
+
+        status_var = tk.StringVar(value="")
+        ttk.Label(content, textvariable=status_var, foreground="#64748b").grid(row=5, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+        button_row = ttk.Frame(content)
+        button_row.grid(row=6, column=0, columnspan=2, sticky="e", pady=(18, 0))
+
+        def _parse_qty() -> int | None:
+            raw_value = qty_var.get().strip()
+            if not raw_value:
+                messagebox.showerror("Invalid input", "Enter a quantity to restock.", parent=modal)
+                return None
+            if not raw_value.isdigit():
+                messagebox.showerror("Invalid input", "Quantity must be a whole number.", parent=modal)
+                return None
+
+            quantity = int(raw_value)
+            if quantity <= 0:
+                messagebox.showerror("Invalid input", "Quantity must be at least 1.", parent=modal)
+                return None
+            return quantity
+
+        def load_product() -> None:
+            nonlocal loaded_product
+            barcode = barcode_var.get().strip()
+            if not barcode:
+                loaded_product = None
+                product_summary_var.set("Enter or scan a barcode first.")
+                status_var.set("")
+                return
+
+            product = inventory.get_product_by_barcode(barcode)
+            if product is None:
+                loaded_product = None
+                product_summary_var.set(f"No product found for barcode: {barcode}")
+                status_var.set("")
+                return
+
+            loaded_product = product
+            product_summary_var.set(
+                f"{product['name']}\n"
+                f"Barcode: {product['barcode']}\n"
+                f"Current stock: {product['stock']}\n"
+                f"Tracked: {'Yes' if product.get('stock_tracked', False) else 'No'}"
+            )
+            status_var.set(f"Loaded: {product['name']}")
+            qty_entry.focus_set()
+            qty_entry.selection_range(0, tk.END)
+
+        def restock_product() -> None:
+            nonlocal loaded_product
+            if loaded_product is None:
+                messagebox.showerror("Invalid input", "Scan a barcode first.", parent=modal)
+                return
+
+            quantity = _parse_qty()
+            if quantity is None:
+                return
+
+            if not messagebox.askyesno(
+                "Confirm restock",
+                f"Add {quantity} to stock for {loaded_product['name']}?",
+                parent=modal,
+            ):
+                return
+
+            try:
+                new_stock = inventory.adjust_stock(loaded_product["id"], quantity)
+            except ValueError as exc:
+                messagebox.showerror("Restock error", str(exc), parent=modal)
+                return
+
+            self.refresh_products(self.search_var.get())
+            self.status_var.set(f"Restocked {loaded_product['name']} by {quantity}. New stock: {new_stock}")
+            loaded_product = None
+            barcode_var.set("")
+            qty_var.set("1")
+            product_summary_var.set("Scan a barcode to load a product.")
+            barcode_entry.focus_set()
+
+        barcode_entry.bind("<Return>", lambda _event: load_product())
+        qty_entry.bind("<Return>", lambda _event: restock_product())
+
+        tk.Button(
+            button_row,
+            text="Load Item",
+            command=load_product,
+            bg="#1d4ed8",
+            fg="white",
+            relief=tk.FLAT,
+            padx=14,
+            pady=8,
+            font=("Segoe UI", 11, "bold"),
+        ).pack(side=tk.LEFT)
+        tk.Button(
+            button_row,
+            text="Restock",
+            command=restock_product,
+            bg="#0ea5e9",
+            fg="white",
+            relief=tk.FLAT,
+            padx=14,
+            pady=8,
+            font=("Segoe UI", 11, "bold"),
+        ).pack(side=tk.LEFT, padx=(8, 0))
+        tk.Button(
+            button_row,
+            text="Cancel",
+            command=modal.destroy,
+            bg="#64748b",
+            fg="white",
+            relief=tk.FLAT,
+            padx=14,
+            pady=8,
+            font=("Segoe UI", 11, "bold"),
+        ).pack(side=tk.RIGHT)
+
+        barcode_entry.focus_set()
 
     def _open_delete_modal(self) -> None:
         product = self._selected_product()
