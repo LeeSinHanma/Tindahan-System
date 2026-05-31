@@ -18,6 +18,7 @@ class DebtTrackerFrame(ttk.Frame):
         self.person_var = tk.StringVar()
         self.amount_var = tk.StringVar()
         self.description_var = tk.StringVar()
+        self.sale_linked_var = tk.BooleanVar(value=True)
         self.new_customer_var = tk.StringVar()
         self.new_customer_var.trace_add("write", lambda *args: self.refresh())
         self.status_var = tk.StringVar(value="Manage customer debt accounts.")
@@ -104,7 +105,13 @@ class DebtTrackerFrame(ttk.Frame):
         desc_entry = ttk.Entry(form_frame, textvariable=self.description_var, font=("Segoe UI", self.theme.body_small))
         desc_entry.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(6, 0))
 
-        self._create_button(form_frame, "Add Debt", self._add_debt_to_customer, "#16a34a", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        ttk.Checkbutton(
+            form_frame,
+            text="Record as sale",
+            variable=self.sale_linked_var,
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 0))
+
+        self._create_button(form_frame, "Add Debt", self._add_debt_to_customer, "#16a34a", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
 
         # Debts list for selected customer
         debts_label = ttk.Label(right_panel, text="Debts", font=("Segoe UI", self.theme.body_medium, "bold"))
@@ -254,9 +261,10 @@ class DebtTrackerFrame(ttk.Frame):
             messagebox.showerror("Invalid input", "Please enter a valid amount", parent=self)
             return
 
-        if debt_tracker.add_debt(self.selected_customer, amount, description):
+        if debt_tracker.add_debt(self.selected_customer, amount, description, self.sale_linked_var.get()):
             self.amount_var.set("")
             self.description_var.set("")
+            self.sale_linked_var.set(True)
             self.status_var.set(f"Added PHP {amount:.2f} debt for {self.selected_customer}")
             self.refresh()
         else:
