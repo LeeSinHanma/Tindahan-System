@@ -133,6 +133,10 @@ def adjust_stock(product_id: int, delta: int) -> int:
     return database.adjust_stock(product_id, delta)
 
 
+def apply_stock_changes(cart_items: list[dict]) -> None:
+    database.apply_stock_changes(cart_items)
+
+
 def set_stock_tracking(product_id: int, stock_tracked: bool, stock_value: int | None = None) -> None:
     database.set_stock_tracking(product_id, stock_tracked, stock_value)
 
