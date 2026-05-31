@@ -3,7 +3,7 @@ from datetime import datetime
 
 
 
-def add_debt(person_name: str, amount: float, description: str = "") -> bool:
+def add_debt(person_name: str, amount: float, description: str = "", sale_linked: bool = True) -> bool:
     """Add a new debt entry."""
     if not person_name or amount <= 0:
         return False
@@ -11,10 +11,10 @@ def add_debt(person_name: str, amount: float, description: str = "") -> bool:
     with get_connection() as conn:
         conn.execute(
             """
-            INSERT INTO debt_tracker (person_name, amount, is_paid, description)
-            VALUES (?, ?, 0, ?)
+            INSERT INTO debt_tracker (person_name, amount, is_paid, description, sale_linked)
+            VALUES (?, ?, 0, ?, ?)
             """,
-            (person_name, amount, description),
+            (person_name, amount, description, 1 if sale_linked else 0),
         )
         conn.commit()
     return True
@@ -129,12 +129,13 @@ def mark_paid(debt_id: int) -> bool:
     """Mark a debt as paid."""
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT amount FROM debt_tracker WHERE id = ? AND is_paid = 0",
+            "SELECT amount, sale_linked FROM debt_tracker WHERE id = ? AND is_paid = 0",
             (debt_id,),
         ).fetchone()
         if not row:
             return False
         amount = float(row["amount"])
+        sale_linked = int(row["sale_linked"] or 0) == 1
 
         conn.execute(
             """
@@ -144,11 +145,12 @@ def mark_paid(debt_id: int) -> bool:
             """,
             (debt_id,),
         )
-        # Record a sale for the debt payment
-        conn.execute(
-            "INSERT INTO sales (total, date) VALUES (?, ?)",
-            (amount, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-        )
+        if sale_linked:
+            # Record a sale only when the debt came from a sale
+            conn.execute(
+                "INSERT INTO sales (total, date) VALUES (?, ?)",
+                (amount, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            )
         conn.commit()
     return True
 
@@ -206,10 +208,11 @@ def apply_payment_to_customer(person_name: str, payment_amount: float) -> dict:
 
     remaining = float(payment_amount)
     details: list[dict] = []
+    sale_total = 0.0
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT id, amount
+            SELECT id, amount, sale_linked
             FROM debt_tracker
             WHERE person_name = ? AND is_paid = 0
             ORDER BY created_at ASC
@@ -220,6 +223,7 @@ def apply_payment_to_customer(person_name: str, payment_amount: float) -> dict:
         for row in rows:
             debt_id = row["id"]
             debt_amount = float(row["amount"])
+            sale_linked = int(row["sale_linked"] or 0) == 1
             if remaining <= 0:
                 break
 
@@ -235,6 +239,8 @@ def apply_payment_to_customer(person_name: str, payment_amount: float) -> dict:
                 )
                 conn.commit()
                 details.append({"debt_id": debt_id, "before": debt_amount, "after": 0.0, "paid": True})
+                if sale_linked:
+                    sale_total += debt_amount
                 remaining -= debt_amount
             else:
                 # partially pay this debt, reduce amount
@@ -249,14 +255,16 @@ def apply_payment_to_customer(person_name: str, payment_amount: float) -> dict:
                 )
                 conn.commit()
                 details.append({"debt_id": debt_id, "before": debt_amount, "after": new_amount, "paid": False})
+                if sale_linked:
+                    sale_total += remaining
                 remaining = 0.0
 
     applied = float(round(payment_amount - remaining, 2))
-    if applied > 0:
+    if sale_total > 0:
         with get_connection() as conn:
             conn.execute(
                 "INSERT INTO sales (total, date) VALUES (?, ?)",
-                (applied, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                (round(sale_total, 2), datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
             )
             conn.commit()
 

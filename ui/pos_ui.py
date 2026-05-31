@@ -7,8 +7,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from core.cart import Cart
-from core.inventory import apply_stock_changes, get_product_by_barcode, get_quick_access_products, search_products
-from core.sales import complete_sale
+from core.inventory import get_product_by_barcode, get_quick_access_products, search_products
+from core.sales import complete_sale, finalize_debt_checkout, validate_checkout_stock
 from core import debt_tracker
 from .theme_manager import ThemeManager
 
@@ -890,7 +890,7 @@ class POSFrame(ttk.Frame):
                 return
 
             try:
-                apply_stock_changes(items)
+                validate_checkout_stock(items)
             except ValueError as exc:
                 messagebox.showerror("Invalid input", str(exc), parent=modal)
                 return
@@ -902,7 +902,9 @@ class POSFrame(ttk.Frame):
             for it in items:
                 desc = f"{it['quantity']}x {it['name']}"
                 amount = float(it["subtotal"])
-                debt_tracker.add_debt(name, amount, desc)
+                debt_tracker.add_debt(name, amount, desc, True)
+
+            finalize_debt_checkout(items)
 
             self.cart.clear()
             self._render_cart()
