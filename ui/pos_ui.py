@@ -194,25 +194,31 @@ class POSFrame(ttk.Frame):
         self.barcode_entry.icursor(tk.END)
 
     def _on_quick_access_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "pos":
+            return ""
+
         focus_widget = self.focus_get()
         if focus_widget is None:
-            return "break"
+            return ""
 
         focus_path = str(focus_widget)
         if not focus_path.startswith(str(self)):
-            return "break"
+            return ""
 
         self._open_quick_access_modal()
         return "break"
 
     def _on_checkout_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "pos":
+            return ""
+
         focus_widget = self.focus_get()
         if focus_widget is None:
-            return "break"
+            return ""
 
         focus_path = str(focus_widget)
         if not focus_path.startswith(str(self)):
-            return "break"
+            return ""
 
         self._checkout()
         return "break"
