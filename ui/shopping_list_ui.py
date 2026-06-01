@@ -8,6 +8,7 @@ from ui.theme import get_theme
 class ShoppingListFrame(ttk.Frame):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master, padding=14)
+        top_level = master.winfo_toplevel()
         self.theme = get_theme()
         self.selected_product_id: int | None = None
         self.selected_list_item_id: int | None = None
@@ -22,6 +23,13 @@ class ShoppingListFrame(ttk.Frame):
 
         self._build_ui()
         self.refresh()
+        top_level.bind("<F1>", self._on_select_all_hotkey, add="+")
+        top_level.bind("<F2>", self._on_clear_selection_hotkey, add="+")
+        top_level.bind("<F3>", self._on_mark_done_hotkey, add="+")
+        top_level.bind("<F4>", self._on_mark_pending_hotkey, add="+")
+        top_level.bind("<F5>", self._on_remove_hotkey, add="+")
+        top_level.bind("<F6>", self._on_set_qty_hotkey, add="+")
+        top_level.bind("<F7>", self._on_clear_done_hotkey, add="+")
 
     def _build_ui(self) -> None:
         header = ttk.Frame(self)
@@ -33,6 +41,46 @@ class ShoppingListFrame(ttk.Frame):
             text="Select products, set quantities, and track what to buy.",
             font=("Segoe UI", self.theme.heading_medium),
         ).pack(anchor="w", pady=(self.theme.padding_xs, 0))
+
+        controls_box = ttk.LabelFrame(header, text="Hotkeys", padding=8)
+        controls_box.pack(anchor="e", pady=(self.theme.padding_xs, 0))
+
+        controls_row = ttk.Frame(controls_box)
+        controls_row.pack(fill=tk.X)
+
+        def add_hotkey_chip(parent: tk.Widget, key_text: str, action_text: str, color: str) -> None:
+            chip = tk.Frame(parent, bg="#f8fafc", highlightbackground=color, highlightcolor=color, highlightthickness=1, bd=0)
+            chip.pack(side=tk.LEFT, padx=(0, 8))
+
+            key_label = tk.Label(
+                chip,
+                text=key_text,
+                bg=color,
+                fg="white",
+                font=("Segoe UI", self.theme.body_small, "bold"),
+                padx=8,
+                pady=2,
+            )
+            key_label.pack(side=tk.LEFT)
+
+            action_label = tk.Label(
+                chip,
+                text=action_text,
+                bg="#f8fafc",
+                fg="#0f172a",
+                font=("Segoe UI", self.theme.body_small, "bold"),
+                padx=8,
+                pady=2,
+            )
+            action_label.pack(side=tk.LEFT)
+
+        add_hotkey_chip(controls_row, "F1", "Select All", "#2563eb")
+        add_hotkey_chip(controls_row, "F2", "Clear Sel.", "#64748b")
+        add_hotkey_chip(controls_row, "F3", "Mark Done", "#0ea5e9")
+        add_hotkey_chip(controls_row, "F4", "Mark Pending", "#475569")
+        add_hotkey_chip(controls_row, "F5", "Remove", "#dc2626")
+        add_hotkey_chip(controls_row, "F6", "Set Qty", "#1d4ed8")
+        add_hotkey_chip(controls_row, "F7", "Clear Done", "#b45309")
 
         content = ttk.Frame(self)
         content.pack(fill=tk.BOTH, expand=True, pady=(self.theme.gap_medium, 0))
@@ -155,16 +203,13 @@ class ShoppingListFrame(ttk.Frame):
         self.list_table.bind("<<TreeviewSelect>>", self._on_list_item_select)
         self.list_table.bind("<Button-1>", self._toggle_list_item_check)
 
-        action_row = ttk.Frame(panel)
-        action_row.grid(row=2, column=0, sticky="ew", pady=(self.theme.gap_medium, 0))
-
-        self._create_button(action_row, "Select All", self._select_all_list_items, "#2563eb").pack(side=tk.LEFT)
-        self._create_button(action_row, "Clear Selection", self._clear_list_selection, "#64748b").pack(side=tk.LEFT, padx=(6, 0))
-        self._create_button(action_row, "Mark Done", lambda: self._mark_selected_done(True), "#0ea5e9").pack(side=tk.LEFT, padx=(6, 0))
-        self._create_button(action_row, "Mark Pending", lambda: self._mark_selected_done(False), "#475569").pack(side=tk.LEFT, padx=(6, 0))
-        self._create_button(action_row, "Remove", self._remove_selected, "#dc2626").pack(side=tk.LEFT, padx=(6, 0))
-        self._create_button(action_row, "Set Qty", self._set_selected_qty, "#1d4ed8").pack(side=tk.LEFT, padx=(6, 0))
-        self._create_button(action_row, "Clear Done", self._clear_done_items, "#b45309").pack(side=tk.RIGHT)
+        controls_note = ttk.Label(
+            panel,
+            text="Use the hotkeys above to manage selected shopping-list items.",
+            foreground="#64748b",
+            font=("Segoe UI", self.theme.body_small, "bold"),
+        )
+        controls_note.grid(row=2, column=0, sticky="w", pady=(self.theme.gap_medium, 0))
 
     def _search_products(self, _event: tk.Event | None = None) -> None:
         self._load_products(self.product_search_var.get())
@@ -295,6 +340,51 @@ class ShoppingListFrame(ttk.Frame):
         self.checked_list_item_ids.clear()
         self._load_list_items()
         self.status_var.set("Shopping-list selection cleared")
+
+    def _shopping_list_hotkey_active(self) -> bool:
+        return getattr(self.winfo_toplevel(), "active_screen", None) == "shopping_list"
+
+    def _on_select_all_hotkey(self, _event: tk.Event | None = None) -> str:
+        if not self._shopping_list_hotkey_active():
+            return ""
+        self._select_all_list_items()
+        return "break"
+
+    def _on_clear_selection_hotkey(self, _event: tk.Event | None = None) -> str:
+        if not self._shopping_list_hotkey_active():
+            return ""
+        self._clear_list_selection()
+        return "break"
+
+    def _on_mark_done_hotkey(self, _event: tk.Event | None = None) -> str:
+        if not self._shopping_list_hotkey_active():
+            return ""
+        self._mark_selected_done(True)
+        return "break"
+
+    def _on_mark_pending_hotkey(self, _event: tk.Event | None = None) -> str:
+        if not self._shopping_list_hotkey_active():
+            return ""
+        self._mark_selected_done(False)
+        return "break"
+
+    def _on_remove_hotkey(self, _event: tk.Event | None = None) -> str:
+        if not self._shopping_list_hotkey_active():
+            return ""
+        self._remove_selected()
+        return "break"
+
+    def _on_set_qty_hotkey(self, _event: tk.Event | None = None) -> str:
+        if not self._shopping_list_hotkey_active():
+            return ""
+        self._set_selected_qty()
+        return "break"
+
+    def _on_clear_done_hotkey(self, _event: tk.Event | None = None) -> str:
+        if not self._shopping_list_hotkey_active():
+            return ""
+        self._clear_done_items()
+        return "break"
 
     def _target_product_ids(self) -> list[int]:
         if self.checked_product_ids:

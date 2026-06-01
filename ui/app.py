@@ -33,6 +33,7 @@ class App:
         self.current_user = None
 
         self.active_screen: str = "login"
+        self.root.active_screen = self.active_screen
         self.nav_buttons: dict[str, tk.Button] = {}
 
         self.shell = ttk.Frame(self.root)
@@ -279,11 +280,13 @@ class App:
             # redirect to login if trying to access protected screen without auth
             messagebox.showwarning("Not authenticated", "Please log in first.", parent=self.root)
             self.active_screen = "login"
+            self.root.active_screen = self.active_screen
             self.frames["login"].tkraise()
             self._update_nav_state()
             return
         
         self.active_screen = screen_name
+        self.root.active_screen = self.active_screen
         frame = self.frames[screen_name]
         frame.tkraise()
 
