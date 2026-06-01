@@ -60,7 +60,18 @@ def _normalize_product_data(product_data: dict) -> dict:
     original_price = _to_float(product_data.get("original_price"))
     sell_price = _to_float(product_data.get("sell_price"))
     stock = _to_int(product_data.get("stock"))
+    parent_product_id = product_data.get("parent_product_id")
+    parent_units = _to_int(product_data.get("parent_units"), default=1)
 
+    if parent_product_id in (None, ""):
+        parent_product_id = None
+    else:
+        parent_product_id = _to_int(parent_product_id)
+
+    if parent_product_id is not None:
+        if parent_units <= 0:
+            raise ValueError("Parent units must be at least 1")
+        stock_tracked = True
     if not name:
         raise ValueError("Product name is required")
     if not barcode:
@@ -88,6 +99,8 @@ def _normalize_product_data(product_data: dict) -> dict:
         "sell_price": sell_price,
         "stock": stock,
         "stock_tracked": stock_tracked,
+        "parent_product_id": parent_product_id,
+        "parent_units": parent_units,
     }
 
 
@@ -135,6 +148,10 @@ def adjust_stock(product_id: int, delta: int) -> int:
 
 def apply_stock_changes(cart_items: list[dict]) -> None:
     database.apply_stock_changes(cart_items)
+
+
+def get_sellable_stock(product_id: int) -> int:
+    return database.get_sellable_stock(product_id)
 
 
 def set_stock_tracking(product_id: int, stock_tracked: bool, stock_value: int | None = None) -> None:
