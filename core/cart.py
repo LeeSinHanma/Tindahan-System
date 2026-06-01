@@ -7,9 +7,10 @@ class Cart:
         current = self._items.get(product_id)
         unit_price = float(product.get("sell_price", product.get("price", 0)))
         stock = int(product.get("stock", 0))
+        sellable_stock = int(product.get("sellable_stock", stock))
         stock_tracked = bool(product.get("stock_tracked", False))
 
-        if stock_tracked and stock <= 0:
+        if stock_tracked and sellable_stock <= 0:
             return False
 
         if current is None:
@@ -20,6 +21,7 @@ class Cart:
                 "price": unit_price,
                 "quantity": 1,
                 "stock": stock,
+                "sellable_stock": sellable_stock,
                 "stock_tracked": stock_tracked,
             }
             return True
@@ -28,7 +30,8 @@ class Cart:
             current["quantity"] += 1
             return True
 
-        if current["quantity"] < current["stock"]:
+        available_stock = int(current.get("sellable_stock", current["stock"]))
+        if current["quantity"] < available_stock:
             current["quantity"] += 1
             return True
 
@@ -45,8 +48,9 @@ class Cart:
             return
 
         stock = self._items[product_id]["stock"]
+        sellable_stock = int(self._items[product_id].get("sellable_stock", stock))
         if self._items[product_id].get("stock_tracked", False):
-            self._items[product_id]["quantity"] = min(quantity, stock)
+            self._items[product_id]["quantity"] = min(quantity, sellable_stock)
         else:
             self._items[product_id]["quantity"] = quantity
 

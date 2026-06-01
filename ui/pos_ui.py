@@ -194,25 +194,31 @@ class POSFrame(ttk.Frame):
         self.barcode_entry.icursor(tk.END)
 
     def _on_quick_access_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "pos":
+            return ""
+
         focus_widget = self.focus_get()
         if focus_widget is None:
-            return "break"
+            return ""
 
         focus_path = str(focus_widget)
         if not focus_path.startswith(str(self)):
-            return "break"
+            return ""
 
         self._open_quick_access_modal()
         return "break"
 
     def _on_checkout_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "pos":
+            return ""
+
         focus_widget = self.focus_get()
         if focus_widget is None:
-            return "break"
+            return ""
 
         focus_path = str(focus_widget)
         if not focus_path.startswith(str(self)):
-            return "break"
+            return ""
 
         self._checkout()
         return "break"
@@ -327,7 +333,8 @@ class POSFrame(ttk.Frame):
         modal.wait_window()
 
     def _add_product_to_cart(self, product: dict, restore_focus: bool = True) -> bool:
-        if product.get("stock_tracked", False) and product["stock"] <= 0:
+        available_stock = int(product.get("sellable_stock", product.get("stock", 0)))
+        if product.get("stock_tracked", False) and available_stock <= 0:
             self.status_var.set(f"Out of stock: {product['name']}")
             return False
 
@@ -416,7 +423,8 @@ class POSFrame(ttk.Frame):
             self.focus_barcode()
             return "break"
 
-        if product.get("stock_tracked", False) and product["stock"] <= 0:
+        available_stock = int(product.get("sellable_stock", product.get("stock", 0)))
+        if product.get("stock_tracked", False) and available_stock <= 0:
             self.status_var.set(f"Out of stock: {product['name']}")
             self.focus_barcode()
             return "break"
@@ -899,12 +907,16 @@ class POSFrame(ttk.Frame):
             if not any(c.get("person_name") == name for c in debt_tracker.get_customers_with_totals()):
                 debt_tracker.add_customer(name)
 
+            try:
+                finalize_debt_checkout(items)
+            except ValueError as exc:
+                messagebox.showerror("Invalid input", str(exc), parent=modal)
+                return
+
             for it in items:
                 desc = f"{it['quantity']}x {it['name']}"
                 amount = float(it["subtotal"])
                 debt_tracker.add_debt(name, amount, desc, True)
-
-            finalize_debt_checkout(items)
 
             self.cart.clear()
             self._render_cart()

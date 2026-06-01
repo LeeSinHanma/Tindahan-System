@@ -1,4 +1,5 @@
 import json
+import math
 import sqlite3
 import sys
 from pathlib import Path
@@ -44,6 +45,10 @@ def _stock_tracked_column_exists(conn: sqlite3.Connection) -> bool:
     return "stock_tracked" in _table_columns(conn, "products")
 
 
+def _parent_product_column_exists(conn: sqlite3.Connection) -> bool:
+    return "parent_product_id" in _table_columns(conn, "products")
+
+
 def init_database() -> None:
     with get_connection() as conn:
         conn.execute(
@@ -56,7 +61,9 @@ def init_database() -> None:
                 original_price REAL NOT NULL DEFAULT 0,
                 sell_price REAL NOT NULL DEFAULT 0,
                 stock INTEGER NOT NULL DEFAULT 0,
-                stock_tracked INTEGER NOT NULL DEFAULT 0
+                stock_tracked INTEGER NOT NULL DEFAULT 0,
+                parent_product_id INTEGER,
+                parent_units INTEGER NOT NULL DEFAULT 1
             )
             """
         )
@@ -172,6 +179,8 @@ def init_database() -> None:
         _ensure_column(conn, "products", "sell_price", "REAL NOT NULL DEFAULT 0")
         _ensure_column(conn, "products", "stock", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "products", "stock_tracked", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "products", "parent_product_id", "INTEGER")
+        _ensure_column(conn, "products", "parent_units", "INTEGER NOT NULL DEFAULT 1")
 
         columns = _table_columns(conn, "products")
         if "price" in columns:
@@ -192,6 +201,8 @@ def init_database() -> None:
 
         if _stock_tracked_column_exists(conn):
             conn.execute("UPDATE products SET stock_tracked = COALESCE(stock_tracked, 0)")
+        if _parent_product_column_exists(conn):
+            conn.execute("UPDATE products SET parent_units = COALESCE(parent_units, 1)")
 
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
@@ -224,7 +235,95 @@ def _normalize_product_row(row: sqlite3.Row) -> dict:
         "sell_price": float(row["sell_price"] or 0),
         "stock": int(row["stock"] or 0),
         "stock_tracked": bool(int(row["stock_tracked"] or 0)) if "stock_tracked" in row.keys() else False,
+        "parent_product_id": int(row["parent_product_id"]) if "parent_product_id" in row.keys() and row["parent_product_id"] is not None else None,
+        "parent_units": int(row["parent_units"] or 1) if "parent_units" in row.keys() else 1,
     }
+
+
+def _get_product_row_for_stock(cursor: sqlite3.Cursor, product_id: int) -> sqlite3.Row:
+    row = cursor.execute(
+        """
+        SELECT id, name, stock, stock_tracked, parent_product_id, parent_units
+        FROM products
+        WHERE id = ?
+        """,
+        (product_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError("Product not found")
+    return row
+
+
+def _get_sellable_stock_for_row(cursor: sqlite3.Cursor, row: sqlite3.Row) -> int:
+    stock = int(row["stock"] or 0)
+    parent_product_id = row["parent_product_id"] if "parent_product_id" in row.keys() else None
+    parent_units = int(row["parent_units"] or 1) if "parent_units" in row.keys() else 1
+
+    if parent_product_id is None or parent_units <= 0:
+        return stock
+
+    parent_row = cursor.execute(
+        "SELECT stock FROM products WHERE id = ?",
+        (int(parent_product_id),),
+    ).fetchone()
+    if parent_row is None:
+        raise ValueError("Parent product not found")
+
+    return stock + (int(parent_row["stock"] or 0) * parent_units)
+
+
+def get_sellable_stock(product_id: int) -> int:
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        row = _get_product_row_for_stock(cursor, product_id)
+        return _get_sellable_stock_for_row(cursor, row)
+
+
+def _consume_stock_from_product(cursor: sqlite3.Cursor, row: sqlite3.Row, quantity: int) -> None:
+    stock_tracked = int(row["stock_tracked"] or 0) == 1
+    if not stock_tracked:
+        return
+
+    current_stock = int(row["stock"] or 0)
+    if quantity <= current_stock:
+        cursor.execute(
+            "UPDATE products SET stock = stock - ? WHERE id = ?",
+            (quantity, int(row["id"])),
+        )
+        return
+
+    parent_product_id = row["parent_product_id"] if "parent_product_id" in row.keys() else None
+    parent_units = int(row["parent_units"] or 1) if "parent_units" in row.keys() else 1
+    if parent_product_id is None or parent_units <= 0:
+        raise ValueError(f"Insufficient stock for {row['name']}")
+
+    parent_row = _get_product_row_for_stock(cursor, int(parent_product_id))
+    parent_stock = int(parent_row["stock"] or 0)
+    available = current_stock + (parent_stock * parent_units)
+    if available < quantity:
+        raise ValueError(f"Insufficient stock for {row['name']}")
+
+    needed = quantity - current_stock
+    boxes_needed = int(math.ceil(needed / parent_units))
+    if boxes_needed > parent_stock:
+        raise ValueError(f"Insufficient stock for {row['name']}")
+
+    if boxes_needed > 0:
+        cursor.execute(
+            "UPDATE products SET stock = stock - ? WHERE id = ?",
+            (boxes_needed, int(parent_row["id"])),
+        )
+        current_stock += boxes_needed * parent_units
+
+    cursor.execute(
+        "UPDATE products SET stock = ? WHERE id = ?",
+        (current_stock - quantity, int(row["id"])),
+    )
+
+
+def _sellable_stock_for_quantity(cursor: sqlite3.Cursor, product_id: int) -> int:
+    row = _get_product_row_for_stock(cursor, product_id)
+    return _get_sellable_stock_for_row(cursor, row)
 
 
 def list_products(search_term: str = "") -> list[dict]:
@@ -259,13 +358,19 @@ def get_product_by_id(product_id: int) -> dict | None:
         row = conn.execute(
             """
             SELECT id, name, description, barcode, original_price, sell_price, stock
-                     , stock_tracked
+                     , stock_tracked, parent_product_id, parent_units
             FROM products
             WHERE id = ?
             """,
             (product_id,),
         ).fetchone()
-    return None if row is None else _normalize_product_row(row)
+    if row is None:
+        return None
+
+    product = _normalize_product_row(row)
+    with get_connection() as conn:
+        product["sellable_stock"] = get_sellable_stock(product_id)
+    return product
 
 
 def get_product_by_barcode(barcode: str) -> dict | None:
@@ -277,18 +382,44 @@ def get_product_by_barcode(barcode: str) -> dict | None:
         row = conn.execute(
             """
             SELECT id, name, description, barcode, original_price, sell_price, stock
-                   , stock_tracked
+                   , stock_tracked, parent_product_id, parent_units
             FROM products
             WHERE barcode = ?
             """,
             (clean_barcode,),
         ).fetchone()
-    return None if row is None else _normalize_product_row(row)
+    if row is None:
+        return None
+
+    product = _normalize_product_row(row)
+    product["sellable_stock"] = get_sellable_stock(product["id"])
+    return product
 
 
 def create_product(product_data: dict) -> int:
     with get_connection() as conn:
-        columns = ["name", "description", "barcode", "original_price", "sell_price", "stock", "stock_tracked"]
+        parent_product_id = product_data.get("parent_product_id")
+        parent_units = int(product_data.get("parent_units", 1) or 1)
+
+        if parent_product_id is not None:
+            parent_row = conn.execute(
+                "SELECT id FROM products WHERE id = ?",
+                (int(parent_product_id),),
+            ).fetchone()
+            if parent_row is None:
+                raise ValueError("Parent product not found")
+
+        columns = [
+            "name",
+            "description",
+            "barcode",
+            "original_price",
+            "sell_price",
+            "stock",
+            "stock_tracked",
+            "parent_product_id",
+            "parent_units",
+        ]
         values = [
             product_data["name"],
             product_data.get("description", ""),
@@ -297,6 +428,8 @@ def create_product(product_data: dict) -> int:
             product_data["sell_price"],
             product_data["stock"],
             int(bool(product_data.get("stock_tracked", False))),
+            int(parent_product_id) if parent_product_id is not None else None,
+            parent_units,
         ]
 
         if _legacy_price_column_exists(conn):
@@ -305,6 +438,12 @@ def create_product(product_data: dict) -> int:
 
         if not _stock_tracked_column_exists(conn):
             columns.remove("stock_tracked")
+            values.pop()
+
+        if not _parent_product_column_exists(conn):
+            columns.remove("parent_product_id")
+            values.pop(-2)
+            columns.remove("parent_units")
             values.pop()
 
         cursor = conn.execute(
@@ -320,6 +459,33 @@ def create_product(product_data: dict) -> int:
 
 def update_product(product_id: int, product_data: dict) -> None:
     with get_connection() as conn:
+        parent_product_id = product_data.get("parent_product_id")
+        parent_units = int(product_data.get("parent_units", 1) or 1)
+
+        if parent_product_id is not None:
+            parent_id = int(parent_product_id)
+            if parent_id == product_id:
+                raise ValueError("A product cannot be its own parent")
+
+            parent_row = conn.execute(
+                "SELECT id, parent_product_id FROM products WHERE id = ?",
+                (parent_id,),
+            ).fetchone()
+            if parent_row is None:
+                raise ValueError("Parent product not found")
+
+            ancestor_id = parent_row["parent_product_id"]
+            while ancestor_id is not None:
+                if int(ancestor_id) == product_id:
+                    raise ValueError("Parent product creates a circular link")
+                ancestor_row = conn.execute(
+                    "SELECT parent_product_id FROM products WHERE id = ?",
+                    (int(ancestor_id),),
+                ).fetchone()
+                if ancestor_row is None:
+                    break
+                ancestor_id = ancestor_row["parent_product_id"]
+
         if _legacy_price_column_exists(conn):
             conn.execute(
                 """
@@ -331,7 +497,9 @@ def update_product(product_id: int, product_data: dict) -> None:
                     original_price = ?,
                     sell_price = ?,
                     stock = ?,
-                    stock_tracked = ?
+                    stock_tracked = ?,
+                    parent_product_id = ?,
+                    parent_units = ?
                 WHERE id = ?
                 """,
                 (
@@ -343,6 +511,8 @@ def update_product(product_id: int, product_data: dict) -> None:
                     product_data["sell_price"],
                     product_data["stock"],
                     int(bool(product_data.get("stock_tracked", False))),
+                    int(parent_product_id) if parent_product_id is not None else None,
+                    parent_units,
                     product_id,
                 ),
             )
@@ -358,7 +528,9 @@ def update_product(product_id: int, product_data: dict) -> None:
                 original_price = ?,
                 sell_price = ?,
                 stock = ?,
-                stock_tracked = ?
+                stock_tracked = ?,
+                parent_product_id = ?,
+                parent_units = ?
             WHERE id = ?
             """,
             (
@@ -369,6 +541,8 @@ def update_product(product_id: int, product_data: dict) -> None:
                 product_data["sell_price"],
                 product_data["stock"],
                 int(bool(product_data.get("stock_tracked", False))),
+                int(parent_product_id) if parent_product_id is not None else None,
+                parent_units,
                 product_id,
             ),
         )
@@ -381,10 +555,11 @@ def delete_product(product_id: int) -> None:
             """
             SELECT
                 (SELECT COUNT(*) FROM sale_items WHERE product_id = ?) +
-                (SELECT COUNT(*) FROM shopping_list_items WHERE product_id = ?)
+                (SELECT COUNT(*) FROM shopping_list_items WHERE product_id = ?) +
+                (SELECT COUNT(*) FROM products WHERE parent_product_id = ?)
             AS usage_count
             """,
-            (product_id, product_id),
+            (product_id, product_id, product_id),
         ).fetchone()["usage_count"]
 
         if usage_count:
@@ -607,18 +782,11 @@ def get_top_selling_products(limit: int = 5, period_days: int | None = None) -> 
 
 def _validate_stock_for_cart_items(cursor: sqlite3.Cursor, cart_items: list[dict]) -> None:
     for item in cart_items:
-        row = cursor.execute(
-            "SELECT stock, stock_tracked FROM products WHERE id = ?",
-            (item["product_id"],),
-        ).fetchone()
-        if row is None:
-            raise ValueError("Product not found")
-
+        row = _get_product_row_for_stock(cursor, item["product_id"])
         quantity = int(item["quantity"])
-        if int(row["stock_tracked"] or 0) == 1:
-            current_stock = int(row["stock"] or 0)
-            if current_stock < quantity:
-                raise ValueError(f"Insufficient stock for {item['name']}")
+        available_stock = _get_sellable_stock_for_row(cursor, row)
+        if int(row["stock_tracked"] or 0) == 1 and available_stock < quantity:
+            raise ValueError(f"Insufficient stock for {item['name']}")
 
 
 def reduce_stock_for_cart_items(cart_items: list[dict]) -> None:
@@ -627,23 +795,15 @@ def reduce_stock_for_cart_items(cart_items: list[dict]) -> None:
 
     with get_connection() as conn:
         cursor = conn.cursor()
-        _validate_stock_for_cart_items(cursor, cart_items)
-        cursor.executemany(
-            """
-            UPDATE products
-            SET stock = stock - ?
-            WHERE id = ? AND stock_tracked = 1
-            """,
-            [(item["quantity"], item["product_id"]) for item in cart_items],
-        )
+        for item in cart_items:
+            row = _get_product_row_for_stock(cursor, item["product_id"])
+            _consume_stock_from_product(cursor, row, int(item["quantity"]))
         conn.commit()
 
 
 def validate_cart_item_stock(cart_items: list[dict]) -> None:
     if not cart_items:
         raise ValueError("Cart is empty")
-
-    _apply_stock_changes(cart_items)
 
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -680,14 +840,9 @@ def record_sale(cart_items: list[dict], total: float, date_value: str) -> int:
             ],
         )
 
-        cursor.executemany(
-            """
-            UPDATE products
-            SET stock = stock - ?
-            WHERE id = ? AND stock_tracked = 1
-            """,
-            [(item["quantity"], item["product_id"]) for item in cart_items],
-        )
+        for item in cart_items:
+            row = _get_product_row_for_stock(cursor, item["product_id"])
+            _consume_stock_from_product(cursor, row, int(item["quantity"]))
 
         conn.commit()
         return sale_id
@@ -699,29 +854,9 @@ def _apply_stock_changes(cart_items: list[dict]) -> None:
 
     with get_connection() as conn:
         cursor = conn.cursor()
-
         for item in cart_items:
-            row = cursor.execute(
-                "SELECT stock, stock_tracked FROM products WHERE id = ?",
-                (item["product_id"],),
-            ).fetchone()
-            if row is None:
-                raise ValueError("Product not found")
-
-            quantity = int(item["quantity"])
-            if int(row["stock_tracked"] or 0) == 1:
-                current_stock = int(row["stock"] or 0)
-                if current_stock < quantity:
-                    raise ValueError(f"Insufficient stock for {item['name']}")
-
-        cursor.executemany(
-            """
-            UPDATE products
-            SET stock = stock - ?
-            WHERE id = ? AND stock_tracked = 1
-            """,
-            [(item["quantity"], item["product_id"]) for item in cart_items],
-        )
+            row = _get_product_row_for_stock(cursor, item["product_id"])
+            _consume_stock_from_product(cursor, row, int(item["quantity"]))
 
         conn.commit()
 

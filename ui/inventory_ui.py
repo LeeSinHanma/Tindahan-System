@@ -21,17 +21,66 @@ class InventoryFrame(ttk.Frame):
 
         self._build_ui()
         self.refresh_products()
+        top_level.bind("<F1>", self._on_create_hotkey, add="+")
+        top_level.bind("<F2>", self._on_update_hotkey, add="+")
+        top_level.bind("<F3>", self._on_delete_hotkey, add="+")
+        top_level.bind("<F4>", self._on_restock_hotkey, add="+")
+        top_level.bind("<F5>", self._on_settings_hotkey, add="+")
 
     def _build_ui(self) -> None:
         header = ttk.Frame(self)
         header.pack(fill=tk.X)
 
-        ttk.Label(header, text="Inventory CRUD", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
+        header_top = ttk.Frame(header)
+        header_top.pack(fill=tk.X)
+
+        title_block = ttk.Frame(header_top)
+        title_block.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        ttk.Label(title_block, text="Inventory CRUD", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
         ttk.Label(
-            header,
-            text="Create products from a modal form, update stock with buttons, or delete with confirmation.",
+            title_block,
+            text="Create products from a modal form, update stock with hotkeys, or delete with confirmation.",
             font=("Segoe UI", self.theme.body_medium),
         ).pack(anchor="w", pady=(4, 0))
+
+        hotkeys_box = ttk.LabelFrame(header_top, text="Hotkeys", padding=8)
+        hotkeys_box.pack(side=tk.RIGHT, anchor="n")
+
+        hotkeys_row = ttk.Frame(hotkeys_box)
+        hotkeys_row.pack(fill=tk.X)
+
+        def add_hotkey_chip(parent: tk.Widget, key_text: str, action_text: str, color: str) -> None:
+            chip = tk.Frame(parent, bg="#f8fafc", highlightbackground=color, highlightcolor=color, highlightthickness=1, bd=0)
+            chip.pack(side=tk.LEFT, padx=(0, 8))
+
+            key_label = tk.Label(
+                chip,
+                text=key_text,
+                bg=color,
+                fg="white",
+                font=("Segoe UI", self.theme.body_small, "bold"),
+                padx=8,
+                pady=2,
+            )
+            key_label.pack(side=tk.LEFT)
+
+            action_label = tk.Label(
+                chip,
+                text=action_text,
+                bg="#f8fafc",
+                fg="#0f172a",
+                font=("Segoe UI", self.theme.body_small, "bold"),
+                padx=8,
+                pady=2,
+            )
+            action_label.pack(side=tk.LEFT)
+
+        add_hotkey_chip(hotkeys_row, "F1", "Create", "#16a34a")
+        add_hotkey_chip(hotkeys_row, "F2", "Update", "#f59e0b")
+        add_hotkey_chip(hotkeys_row, "F3", "Delete", "#dc2626")
+        add_hotkey_chip(hotkeys_row, "F4", "Restock", "#0ea5e9")
+        add_hotkey_chip(hotkeys_row, "F5", "Settings", "#a855f7")
 
         toolbar = ttk.Frame(self)
         toolbar.pack(fill=tk.X, pady=(12, 10))
@@ -47,11 +96,6 @@ class InventoryFrame(ttk.Frame):
         self._create_toolbar_button(toolbar, "Search", self._on_search, "#1d4ed8").pack(side=tk.LEFT, padx=(0, 8))
         self._create_toolbar_button(toolbar, "Show All", self._show_all, "#64748b").pack(side=tk.LEFT)
         self._create_toolbar_button(toolbar, "Untracked Items", self._show_untracked, "#4f46e5").pack(side=tk.LEFT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Settings", self._open_settings_modal, "#a855f7").pack(side=tk.LEFT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Restock", self._open_restock_modal, "#0ea5e9").pack(side=tk.LEFT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Create", self._open_create_modal, "#16a34a").pack(side=tk.RIGHT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Delete", self._open_delete_modal, "#dc2626").pack(side=tk.RIGHT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Update", self._open_update_modal, "#f59e0b").pack(side=tk.RIGHT, padx=(8, 0))
 
         table_box = ttk.Frame(self)
         table_box.pack(fill=tk.BOTH, expand=True)
@@ -104,6 +148,36 @@ class InventoryFrame(ttk.Frame):
             cursor="hand2",
         )
 
+    def _on_create_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_create_modal()
+        return "break"
+
+    def _on_update_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_update_modal()
+        return "break"
+
+    def _on_delete_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_delete_modal()
+        return "break"
+
+    def _on_restock_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_restock_modal()
+        return "break"
+
+    def _on_settings_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_settings_modal()
+        return "break"
+
     def _open_modal_shell(self, title: str, width: int = 520, height: int = 420) -> tk.Toplevel:
         modal = tk.Toplevel(self)
         modal.title(title)
@@ -148,6 +222,34 @@ class InventoryFrame(ttk.Frame):
             "stock": self._create_vars["stock"].get(),
             "stock_tracked": self._create_vars["stock_tracked"].get(),
         }
+
+    def _resolve_parent_link(self, current_product_id: int | None, current_barcode: str, vars_map: dict[str, tk.Variable]) -> dict:
+        if not bool(vars_map["parent_linked"].get()):
+            return {"parent_product_id": None, "parent_units": 1}
+
+        parent_barcode = str(vars_map["parent_barcode"].get()).strip()
+        if not parent_barcode:
+            raise ValueError("Enter the parent item barcode")
+
+        parent_product = inventory.get_product_by_barcode(parent_barcode)
+        if parent_product is None:
+            raise ValueError("Parent product not found")
+
+        if current_product_id is not None and parent_product["id"] == current_product_id:
+            raise ValueError("A product cannot be its own parent")
+
+        if current_barcode and parent_product["barcode"] == current_barcode:
+            raise ValueError("A product cannot be its own parent")
+
+        try:
+            parent_units = int(str(vars_map["parent_units"].get()).strip() or "1")
+        except ValueError:
+            raise ValueError("Parent units must be a whole number")
+
+        if parent_units <= 0:
+            raise ValueError("Parent units must be at least 1")
+
+        return {"parent_product_id": parent_product["id"], "parent_units": parent_units}
 
     def _selected_product(self) -> dict | None:
         if self.selected_product_id is None:
@@ -209,7 +311,7 @@ class InventoryFrame(ttk.Frame):
         self.status_var.set(f"Loaded {len(products)} products. Low stock: {low_stock_count}")
 
     def _open_create_modal(self) -> None:
-        modal = self._open_modal_shell("Create Product", 540, 500)
+        modal = self._open_modal_shell("Create Product", 540, 640)
 
         content = ttk.Frame(modal, padding=16)
         content.pack(fill=tk.BOTH, expand=True)
@@ -225,6 +327,9 @@ class InventoryFrame(ttk.Frame):
             "sell_price": tk.StringVar(),
             "stock": tk.StringVar(),
             "stock_tracked": tk.BooleanVar(value=False),
+            "parent_linked": tk.BooleanVar(value=False),
+            "parent_barcode": tk.StringVar(),
+            "parent_units": tk.StringVar(value="1"),
         }
 
         content.columnconfigure(1, weight=1)
@@ -262,12 +367,25 @@ class InventoryFrame(ttk.Frame):
             font=("Segoe UI", 10),
         ).pack(anchor="w", pady=(2, 0))
 
+        parent_row = ttk.Frame(content)
+        parent_row.grid(row=11, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        ttk.Checkbutton(
+            parent_row,
+            text="Link stock to a parent item",
+            variable=self._create_vars["parent_linked"],
+        ).pack(anchor="w")
+
+        self._field_row(content, "Parent Barcode", self._create_vars["parent_barcode"], 12)
+        self._field_row(content, "Units per Parent", self._create_vars["parent_units"], 13)
+
         button_row = ttk.Frame(content)
-        button_row.grid(row=11, column=0, columnspan=2, sticky="e", pady=(18, 0))
+        button_row.grid(row=14, column=0, columnspan=2, sticky="e", pady=(18, 0))
 
         def submit() -> None:
             try:
-                product_id = inventory.create_product(self._product_payload())
+                payload = self._product_payload()
+                payload.update(self._resolve_parent_link(None, payload["barcode"], self._create_vars))
+                product_id = inventory.create_product(payload)
             except ValueError as exc:
                 messagebox.showerror("Validation error", str(exc), parent=modal)
                 return
@@ -311,7 +429,7 @@ class InventoryFrame(ttk.Frame):
             messagebox.showinfo("Update product", "Select a product first.", parent=self)
             return
 
-        modal = self._open_modal_shell("Update Product", 560, 580)
+        modal = self._open_modal_shell("Update Product", 560, 680)
         content = ttk.Frame(modal, padding=16)
         content.pack(fill=tk.BOTH, expand=True)
 
@@ -326,7 +444,15 @@ class InventoryFrame(ttk.Frame):
             "sell_price": tk.StringVar(value=f"{product['sell_price']:.2f}"),
             "stock": tk.StringVar(value=str(product["stock"])),
             "stock_tracked": tk.BooleanVar(value=bool(product.get("stock_tracked", False))),
+            "parent_linked": tk.BooleanVar(value=bool(product.get("parent_product_id") is not None)),
+            "parent_barcode": tk.StringVar(),
+            "parent_units": tk.StringVar(value=str(product.get("parent_units", 1))),
         }
+
+        if product.get("parent_product_id") is not None:
+            parent_product = inventory.get_product_by_id(int(product["parent_product_id"]))
+            if parent_product is not None:
+                vars_map["parent_barcode"].set(parent_product["barcode"])
 
         self._update_vars = vars_map
 
@@ -365,8 +491,19 @@ class InventoryFrame(ttk.Frame):
             font=("Segoe UI", 10),
         ).pack(anchor="w", pady=(2, 0))
 
+        parent_row = ttk.Frame(content)
+        parent_row.grid(row=11, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        ttk.Checkbutton(
+            parent_row,
+            text="Link stock to a parent item",
+            variable=vars_map["parent_linked"],
+        ).pack(anchor="w")
+
+        self._field_row(content, "Parent Barcode", vars_map["parent_barcode"], 12)
+        self._field_row(content, "Units per Parent", vars_map["parent_units"], 13)
+
         stock_buttons = ttk.Frame(content)
-        stock_buttons.grid(row=11, column=0, columnspan=2, sticky="w", pady=(6, 10))
+        stock_buttons.grid(row=14, column=0, columnspan=2, sticky="w", pady=(6, 10))
 
         def add_stock() -> None:
             try:
@@ -393,7 +530,7 @@ class InventoryFrame(ttk.Frame):
         tk.Button(stock_buttons, text="Clear Stock", command=clear_stock, bg="#475569", fg="white", relief=tk.FLAT, padx=14, pady=8, font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT, padx=(8, 0))
 
         button_row = ttk.Frame(content)
-        button_row.grid(row=12, column=0, columnspan=2, sticky="e", pady=(18, 0))
+        button_row.grid(row=15, column=0, columnspan=2, sticky="e", pady=(18, 0))
 
         def submit() -> None:
             if not messagebox.askyesno(
@@ -404,7 +541,9 @@ class InventoryFrame(ttk.Frame):
                 return
 
             try:
-                inventory.update_product(product["id"], {key: value.get() for key, value in vars_map.items()})
+                payload = {key: value.get() for key, value in vars_map.items()}
+                payload.update(self._resolve_parent_link(product["id"], payload["barcode"], vars_map))
+                inventory.update_product(product["id"], payload)
             except ValueError as exc:
                 messagebox.showerror("Validation error", str(exc), parent=modal)
                 return
