@@ -21,17 +21,66 @@ class InventoryFrame(ttk.Frame):
 
         self._build_ui()
         self.refresh_products()
+        top_level.bind("<F1>", self._on_create_hotkey, add="+")
+        top_level.bind("<F2>", self._on_update_hotkey, add="+")
+        top_level.bind("<F3>", self._on_delete_hotkey, add="+")
+        top_level.bind("<F4>", self._on_restock_hotkey, add="+")
+        top_level.bind("<F5>", self._on_settings_hotkey, add="+")
 
     def _build_ui(self) -> None:
         header = ttk.Frame(self)
         header.pack(fill=tk.X)
 
-        ttk.Label(header, text="Inventory CRUD", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
+        header_top = ttk.Frame(header)
+        header_top.pack(fill=tk.X)
+
+        title_block = ttk.Frame(header_top)
+        title_block.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        ttk.Label(title_block, text="Inventory CRUD", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
         ttk.Label(
-            header,
-            text="Create products from a modal form, update stock with buttons, or delete with confirmation.",
+            title_block,
+            text="Create products from a modal form, update stock with hotkeys, or delete with confirmation.",
             font=("Segoe UI", self.theme.body_medium),
         ).pack(anchor="w", pady=(4, 0))
+
+        hotkeys_box = ttk.LabelFrame(header_top, text="Hotkeys", padding=8)
+        hotkeys_box.pack(side=tk.RIGHT, anchor="n")
+
+        hotkeys_row = ttk.Frame(hotkeys_box)
+        hotkeys_row.pack(fill=tk.X)
+
+        def add_hotkey_chip(parent: tk.Widget, key_text: str, action_text: str, color: str) -> None:
+            chip = tk.Frame(parent, bg="#f8fafc", highlightbackground=color, highlightcolor=color, highlightthickness=1, bd=0)
+            chip.pack(side=tk.LEFT, padx=(0, 8))
+
+            key_label = tk.Label(
+                chip,
+                text=key_text,
+                bg=color,
+                fg="white",
+                font=("Segoe UI", self.theme.body_small, "bold"),
+                padx=8,
+                pady=2,
+            )
+            key_label.pack(side=tk.LEFT)
+
+            action_label = tk.Label(
+                chip,
+                text=action_text,
+                bg="#f8fafc",
+                fg="#0f172a",
+                font=("Segoe UI", self.theme.body_small, "bold"),
+                padx=8,
+                pady=2,
+            )
+            action_label.pack(side=tk.LEFT)
+
+        add_hotkey_chip(hotkeys_row, "F1", "Create", "#16a34a")
+        add_hotkey_chip(hotkeys_row, "F2", "Update", "#f59e0b")
+        add_hotkey_chip(hotkeys_row, "F3", "Delete", "#dc2626")
+        add_hotkey_chip(hotkeys_row, "F4", "Restock", "#0ea5e9")
+        add_hotkey_chip(hotkeys_row, "F5", "Settings", "#a855f7")
 
         toolbar = ttk.Frame(self)
         toolbar.pack(fill=tk.X, pady=(12, 10))
@@ -47,11 +96,6 @@ class InventoryFrame(ttk.Frame):
         self._create_toolbar_button(toolbar, "Search", self._on_search, "#1d4ed8").pack(side=tk.LEFT, padx=(0, 8))
         self._create_toolbar_button(toolbar, "Show All", self._show_all, "#64748b").pack(side=tk.LEFT)
         self._create_toolbar_button(toolbar, "Untracked Items", self._show_untracked, "#4f46e5").pack(side=tk.LEFT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Settings", self._open_settings_modal, "#a855f7").pack(side=tk.LEFT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Restock", self._open_restock_modal, "#0ea5e9").pack(side=tk.LEFT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Create", self._open_create_modal, "#16a34a").pack(side=tk.RIGHT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Delete", self._open_delete_modal, "#dc2626").pack(side=tk.RIGHT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Update", self._open_update_modal, "#f59e0b").pack(side=tk.RIGHT, padx=(8, 0))
 
         table_box = ttk.Frame(self)
         table_box.pack(fill=tk.BOTH, expand=True)
@@ -103,6 +147,36 @@ class InventoryFrame(ttk.Frame):
             font=("Segoe UI", self.theme.body_medium, "bold"),
             cursor="hand2",
         )
+
+    def _on_create_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_create_modal()
+        return "break"
+
+    def _on_update_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_update_modal()
+        return "break"
+
+    def _on_delete_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_delete_modal()
+        return "break"
+
+    def _on_restock_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_restock_modal()
+        return "break"
+
+    def _on_settings_hotkey(self, _event: tk.Event | None = None) -> str:
+        if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
+            return ""
+        self._open_settings_modal()
+        return "break"
 
     def _open_modal_shell(self, title: str, width: int = 520, height: int = 420) -> tk.Toplevel:
         modal = tk.Toplevel(self)
