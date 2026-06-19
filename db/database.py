@@ -733,6 +733,55 @@ def get_recent_sales(limit: int = 5, period_days: int | None = None) -> list[dic
     ]
 
 
+def get_sale_details(sale_id: int) -> dict | None:
+    with get_connection() as conn:
+        sale_row = conn.execute(
+            """
+            SELECT id, total, date
+            FROM sales
+            WHERE id = ?
+            """,
+            (sale_id,),
+        ).fetchone()
+        if sale_row is None:
+            return None
+
+        item_rows = conn.execute(
+            """
+            SELECT si.product_id,
+                   p.name AS product_name,
+                   si.quantity,
+                   si.price
+            FROM sale_items si
+            LEFT JOIN products p ON p.id = si.product_id
+            WHERE si.sale_id = ?
+            ORDER BY si.id ASC
+            """,
+            (sale_id,),
+        ).fetchall()
+
+    items: list[dict] = []
+    for row in item_rows:
+        quantity = int(row["quantity"] or 0)
+        unit_price = float(row["price"] or 0)
+        items.append(
+            {
+                "product_id": int(row["product_id"]),
+                "product_name": row["product_name"] or f"Product #{int(row['product_id'])}",
+                "quantity": quantity,
+                "price": unit_price,
+                "subtotal": quantity * unit_price,
+            }
+        )
+
+    return {
+        "id": int(sale_row["id"]),
+        "total": float(sale_row["total"] or 0),
+        "date": sale_row["date"],
+        "items": items,
+    }
+
+
 def get_daily_sales(days: int = 7) -> list[dict]:
     with get_connection() as conn:
         rows = conn.execute(
