@@ -1,11 +1,19 @@
 class Cart:
     def __init__(self) -> None:
         self._items: dict[int, dict] = {}
+        self._no_profit_pricing = False
+
+    def set_no_profit_pricing(self, enabled: bool) -> None:
+        self._no_profit_pricing = bool(enabled)
+        for item in self._items.values():
+            item["price"] = item["original_price"] if self._no_profit_pricing else item["sell_price"]
 
     def add_product(self, product: dict) -> bool:
         product_id = product["id"]
         current = self._items.get(product_id)
-        unit_price = float(product.get("sell_price", product.get("price", 0)))
+        sell_price = float(product.get("sell_price", product.get("price", 0)))
+        original_price = float(product.get("original_price", sell_price))
+        unit_price = original_price if self._no_profit_pricing else sell_price
         stock = int(product.get("stock", 0))
         sellable_stock = int(product.get("sellable_stock", stock))
         stock_tracked = bool(product.get("stock_tracked", False))
@@ -19,6 +27,8 @@ class Cart:
                 "name": product["name"],
                 "barcode": product["barcode"],
                 "price": unit_price,
+                "sell_price": sell_price,
+                "original_price": original_price,
                 "quantity": 1,
                 "stock": stock,
                 "sellable_stock": sellable_stock,

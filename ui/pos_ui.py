@@ -27,6 +27,7 @@ class POSFrame(ttk.Frame):
         self.barcode_var = tk.StringVar()
         self.search_var = tk.StringVar()
         self.qty_var = tk.StringVar(value="1")
+        self.no_profit_var = tk.BooleanVar(value=False)
         self.total_var = tk.StringVar(value="Total: PHP 0.00")
         self.items_count_var = tk.StringVar(value="Items: 0")
         self.status_var = tk.StringVar(value="Ready: scan a barcode")
@@ -165,6 +166,14 @@ class POSFrame(ttk.Frame):
         self._create_action_button(actions, "- Qty", self._decrease_quantity, "#64748b").pack(side=tk.LEFT)
         self._create_action_button(actions, "+ Qty", self._increase_quantity, "#0ea5e9").pack(side=tk.LEFT, padx=(8, 0))
         self._create_action_button(actions, "Remove", self._remove_selected, "#b91c1c").pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Checkbutton(
+            actions,
+            text="No Profit",
+            variable=self.no_profit_var,
+            command=self._toggle_no_profit_pricing,
+        ).pack(side=tk.LEFT, padx=(12, 0))
+
         self._create_action_button(actions, "Clear Cart", self._clear_cart, "#475569").pack(side=tk.RIGHT)
         self._create_action_button(actions, "Checkout Debt", self._checkout_debt, "#f59e0b").pack(side=tk.RIGHT, padx=(0, 8))
         self._create_action_button(actions, "Checkout", self._checkout, "#16a34a").pack(side=tk.RIGHT, padx=(0, 8))
@@ -532,6 +541,19 @@ class POSFrame(ttk.Frame):
     def _decrease_quantity(self) -> None:
         self._adjust_selected_quantity(-1)
 
+    def _toggle_no_profit_pricing(self) -> None:
+        enabled = self.no_profit_var.get()
+        self.cart.set_no_profit_pricing(enabled)
+        self._render_cart()
+        if enabled:
+            self.status_var.set("No Profit enabled: using original prices")
+        else:
+            self.status_var.set("No Profit disabled: using sell prices")
+
+    def _reset_no_profit_pricing(self) -> None:
+        self.no_profit_var.set(False)
+        self.cart.set_no_profit_pricing(False)
+
     def _is_valid_money_text(self, new_text: str) -> bool:
         if new_text == "":
             return True
@@ -541,10 +563,11 @@ class POSFrame(ttk.Frame):
             return False
         return True
 
-    def _open_payment_modal(self, total: float) -> tuple[float, float] | None:
+    def _open_payment_modal(self) -> tuple[float, float, float] | None:
+        total = self.cart.get_total()
         modal = tk.Toplevel(self)
         modal.title("Payment")
-        width, height = 480, 300
+        width, height = 480, 340
         modal.geometry(f"{width}x{height}")
         modal.resizable(False, False)
         modal.transient(self.winfo_toplevel())
@@ -567,17 +590,36 @@ class POSFrame(ttk.Frame):
         ttk.Label(content, text="Checkout Payment", font=("Segoe UI", 13, "bold")).grid(
             row=0, column=0, columnspan=2, sticky="w"
         )
-        ttk.Label(content, text=f"Amount to pay: PHP {total:.2f}").grid(
+        total_text_var = tk.StringVar(value=f"Amount to pay: PHP {total:.2f}")
+        ttk.Label(content, textvariable=total_text_var).grid(
             row=1, column=0, columnspan=2, sticky="w", pady=(6, 8)
         )
 
+        no_profit_checkout_var = tk.BooleanVar(value=self.no_profit_var.get())
+        ttk.Checkbutton(
+            content,
+            text="No Profit",
+            variable=no_profit_checkout_var,
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 6))
+
+        misc_var = tk.StringVar(value="0")
         amount_given_var = tk.StringVar()
         change_var = tk.StringVar(value="PHP 0.00")
         error_var = tk.StringVar(value="")
         payment_result: dict[str, float] = {}
-
-        ttk.Label(content, text="Amount given:").grid(row=2, column=0, sticky="w", pady=4)
         validate_cmd = (modal.register(self._is_valid_money_text), "%P")
+
+        ttk.Label(content, text="Misc:").grid(row=3, column=0, sticky="w", pady=4)
+        misc_entry = ttk.Entry(
+            content,
+            textvariable=misc_var,
+            validate="key",
+            validatecommand=validate_cmd,
+            font=("Segoe UI", 11),
+        )
+        misc_entry.grid(row=3, column=1, sticky="ew", pady=4)
+
+        ttk.Label(content, text="Amount given:").grid(row=4, column=0, sticky="w", pady=4)
         amount_entry = ttk.Entry(
             content,
             textvariable=amount_given_var,
@@ -585,18 +627,36 @@ class POSFrame(ttk.Frame):
             validatecommand=validate_cmd,
             font=("Segoe UI", 11),
         )
-        amount_entry.grid(row=2, column=1, sticky="ew", pady=4)
+        amount_entry.grid(row=4, column=1, sticky="ew", pady=4)
 
-        ttk.Label(content, text="Change:").grid(row=3, column=0, sticky="w", pady=4)
+        ttk.Label(content, text="Change:").grid(row=5, column=0, sticky="w", pady=4)
         ttk.Label(content, textvariable=change_var, font=("Segoe UI", 10, "bold")).grid(
-            row=3, column=1, sticky="w", pady=4
+            row=5, column=1, sticky="w", pady=4
         )
         ttk.Label(content, textvariable=error_var, foreground="#b91c1c").grid(
-            row=4, column=0, columnspan=2, sticky="w", pady=(4, 8)
+            row=6, column=0, columnspan=2, sticky="w", pady=(4, 8)
         )
         content.columnconfigure(1, weight=1)
 
+        def current_total_due() -> float | None:
+            misc_text = misc_var.get().strip() or "0"
+            try:
+                misc_value = float(misc_text)
+            except ValueError:
+                return None
+            if misc_value < 0:
+                return None
+            return self.cart.get_total() + misc_value
+
         def update_change(*_args) -> None:
+            total_due = current_total_due()
+            if total_due is None:
+                total_text_var.set("Amount to pay: PHP --")
+                change_var.set("PHP 0.00")
+                error_var.set("Misc must be a non-negative number")
+                return
+
+            total_text_var.set(f"Amount to pay: PHP {total_due:.2f}")
             value_text = amount_given_var.get().strip()
             if not value_text:
                 change_var.set("PHP 0.00")
@@ -610,17 +670,27 @@ class POSFrame(ttk.Frame):
                 error_var.set("Amount given must be numeric")
                 return
 
-            change_amount = amount_value - total
+            change_amount = amount_value - total_due
             change_var.set(f"PHP {max(change_amount, 0):.2f}")
             if change_amount < 0:
                 error_var.set("Amount given cannot be less than amount to pay")
             else:
                 error_var.set("")
 
+        def on_toggle_no_profit() -> None:
+            enabled = no_profit_checkout_var.get()
+            self.no_profit_var.set(enabled)
+            self.cart.set_no_profit_pricing(enabled)
+            self._render_cart()
+            update_change()
+
+        no_profit_checkout_var.trace_add("write", lambda *_args: on_toggle_no_profit())
+
+        misc_var.trace_add("write", update_change)
         amount_given_var.trace_add("write", update_change)
 
         button_row = ttk.Frame(content)
-        button_row.grid(row=5, column=0, columnspan=2, sticky="e", pady=(10, 0))
+        button_row.grid(row=7, column=0, columnspan=2, sticky="e", pady=(10, 0))
 
         def submit_payment() -> None:
             value_text = amount_given_var.get().strip()
@@ -634,12 +704,18 @@ class POSFrame(ttk.Frame):
                 error_var.set("Amount given must be numeric")
                 return
 
-            if amount_value < total:
+            total_due = current_total_due()
+            if total_due is None:
+                error_var.set("Misc must be a non-negative number")
+                return
+
+            if amount_value < total_due:
                 error_var.set("Amount given cannot be less than amount to pay")
                 return
 
             payment_result["amount_given"] = amount_value
-            payment_result["change"] = amount_value - total
+            payment_result["change"] = amount_value - total_due
+            payment_result["total_due"] = total_due
             modal.destroy()
 
         modal.bind("<Return>", lambda _event: submit_payment())
@@ -672,7 +748,7 @@ class POSFrame(ttk.Frame):
 
         if "amount_given" not in payment_result:
             return None
-        return payment_result["amount_given"], payment_result["change"]
+        return payment_result["amount_given"], payment_result["change"], payment_result["total_due"]
 
     def _center_modal(self, modal: tk.Toplevel, width: int, height: int) -> None:
         modal.update_idletasks()
@@ -695,6 +771,7 @@ class POSFrame(ttk.Frame):
 
     def _clear_cart(self) -> None:
         self.cart.clear()
+        self._reset_no_profit_pricing()
         self.selected_product_id = None
         self._render_cart()
         self.status_var.set("Cart cleared")
@@ -707,16 +784,16 @@ class POSFrame(ttk.Frame):
             self.focus_barcode()
             return
 
-        total = self.cart.get_total()
-        payment = self._open_payment_modal(total)
+        payment = self._open_payment_modal()
         if payment is None:
             self.status_var.set("Checkout cancelled")
             self.focus_barcode()
             return
 
-        amount_given, change = payment
+        amount_given, change, total_due = payment
+        items = self.cart.get_items()
         try:
-            sale_id = complete_sale(items, total, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            sale_id = complete_sale(items, total_due, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         except ValueError as exc:
             self.status_var.set(str(exc))
             self.focus_barcode()
@@ -725,6 +802,7 @@ class POSFrame(ttk.Frame):
         self._play_checkout_sound()
 
         self.cart.clear()
+        self._reset_no_profit_pricing()
         self.selected_product_id = None
         self._render_cart()
         self.status_var.set(
@@ -919,6 +997,7 @@ class POSFrame(ttk.Frame):
                 debt_tracker.add_debt(name, amount, desc, True)
 
             self.cart.clear()
+            self._reset_no_profit_pricing()
             self._render_cart()
             self.status_var.set(f"Added debt for {name}: PHP {sum(it['subtotal'] for it in items):.2f}")
             modal.destroy()

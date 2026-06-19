@@ -60,6 +60,7 @@ class DebtTrackerFrame(ttk.Frame):
         new_cust_entry = ttk.Entry(new_cust_row, textvariable=self.new_customer_var)
         new_cust_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._create_button(new_cust_row, "New Customer", self._add_customer, "#4f46e5", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).pack(side=tk.LEFT, padx=(6, 0))
+        self._create_button(new_cust_row, "Delete Customer", self._delete_customer, "#dc2626", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).pack(side=tk.LEFT, padx=(6, 0))
 
         customer_table_frame = ttk.Frame(left_panel)
         customer_table_frame.pack(fill=tk.BOTH, expand=True)
@@ -202,6 +203,39 @@ class DebtTrackerFrame(ttk.Frame):
             self.refresh()
         else:
             messagebox.showerror("Invalid input", "Failed to add customer or customer already exists", parent=self)
+
+    def _delete_customer(self) -> None:
+        if not self.selected_customer:
+            messagebox.showerror("Invalid input", "Please select a customer to delete", parent=self)
+            return
+
+        customer_name = self.selected_customer
+        customer_debts = debt_tracker.get_customer_debts(customer_name)
+        pending_count = sum(1 for debt in customer_debts if not debt.get("is_paid", 0))
+        total_count = len(customer_debts)
+
+        confirm_message = (
+            f"Delete customer account '{customer_name}'?\n\n"
+            f"This will remove {total_count} debt record(s) "
+            f"({pending_count} pending).\n"
+            "This action cannot be undone."
+        )
+        if not messagebox.askyesno("Confirm Delete", confirm_message, parent=self):
+            return
+
+        if debt_tracker.delete_customer(customer_name):
+            self.status_var.set(f"Customer '{customer_name}' deleted")
+            self.selected_customer = None
+            self.selected_debt_id = None
+            self.person_var.set("")
+            self.amount_var.set("")
+            self.description_var.set("")
+            self.pay_amount_var.set("")
+            for row_id in self.debt_table.get_children():
+                self.debt_table.delete(row_id)
+            self.refresh()
+        else:
+            messagebox.showerror("Delete failed", "Failed to delete customer", parent=self)
 
     def _on_customer_select(self, _event: tk.Event) -> None:
         selected = self.customer_table.selection()
