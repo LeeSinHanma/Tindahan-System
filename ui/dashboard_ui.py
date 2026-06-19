@@ -153,6 +153,7 @@ class DashboardFrame(ttk.Frame):
         self.sales_table.column("time", width=100)
         self.sales_table.column("total", width=110, anchor=tk.E)
         self.sales_table.pack(fill=tk.BOTH, expand=True)
+        self.sales_table.bind("<Double-1>", self._open_sale_details_modal)
 
         right_top = ttk.LabelFrame(content, text="Top Selling Products", padding=inner_padding)
         right_top.grid(row=0, column=1, sticky="nsew")
@@ -269,6 +270,109 @@ class DashboardFrame(ttk.Frame):
             self.sales_chart.create_line(*coords, fill="#2563eb", width=2, smooth=True)
 
         self.sales_chart.create_text(left + 4, top + 8, text=f"PHP {max_total:.0f}", anchor="w", fill="#64748b", font=("Segoe UI", 9))
+
+    def _open_sale_details_modal(self, _event: tk.Event | None = None) -> None:
+        selected = self.sales_table.selection()
+        if not selected:
+            return
+
+        values = self.sales_table.item(selected[0], "values")
+        if not values:
+            return
+
+        try:
+            sale_id = int(values[0])
+        except (ValueError, TypeError):
+            return
+
+        sale = database.get_sale_details(sale_id)
+        if sale is None:
+            return
+
+        modal = tk.Toplevel(self)
+        modal.title(f"Sale #{sale_id} Details")
+        width, height = 720, 500
+        screen_w = modal.winfo_screenwidth()
+        screen_h = modal.winfo_screenheight()
+        pos_x = max((screen_w - width) // 2, 0)
+        pos_y = max((screen_h - height) // 2, 0)
+        modal.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
+        modal.resizable(True, True)
+        modal.transient(self.winfo_toplevel())
+        modal.update_idletasks()
+        modal.lift()
+        modal.focus_force()
+
+        content = ttk.Frame(modal, padding=14)
+        content.pack(fill=tk.BOTH, expand=True)
+        content.columnconfigure(0, weight=1)
+        content.rowconfigure(1, weight=1)
+
+        header = ttk.Frame(content)
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        ttk.Label(header, text=f"Transaction #{sale['id']}", font=("Segoe UI", 13, "bold")).pack(anchor="w")
+
+        date_text = sale["date"]
+        sale_date = date_text[:10] if len(date_text) >= 10 else date_text
+        sale_time = date_text[11:19] if len(date_text) >= 19 else "--:--:--"
+        ttk.Label(header, text=f"Date: {sale_date} {sale_time}", font=("Segoe UI", 10)).pack(anchor="w", pady=(2, 0))
+        ttk.Label(header, text=f"Total: PHP {sale['total']:.2f}", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(2, 0))
+
+        table_frame = ttk.Frame(content)
+        table_frame.grid(row=1, column=0, sticky="nsew")
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
+
+        item_columns = ("product", "qty", "unit_price", "subtotal")
+        items_table = ttk.Treeview(table_frame, columns=item_columns, show="headings", height=12)
+        items_table.heading("product", text="Product")
+        items_table.heading("qty", text="Qty")
+        items_table.heading("unit_price", text="Unit Price")
+        items_table.heading("subtotal", text="Subtotal")
+        items_table.column("product", width=280)
+        items_table.column("qty", width=70, anchor=tk.CENTER)
+        items_table.column("unit_price", width=120, anchor=tk.E)
+        items_table.column("subtotal", width=120, anchor=tk.E)
+        items_table.grid(row=0, column=0, sticky="nsew")
+
+        items_scroll = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=items_table.yview)
+        items_scroll.grid(row=0, column=1, sticky="ns")
+        items_table.configure(yscrollcommand=items_scroll.set)
+
+        items = sale.get("items", [])
+        if not items:
+            ttk.Label(
+                content,
+                text="No item breakdown recorded for this sale.",
+                foreground="#64748b",
+                font=("Segoe UI", 10, "bold"),
+            ).grid(row=2, column=0, sticky="w", pady=(10, 0))
+        else:
+            for item in items:
+                items_table.insert(
+                    "",
+                    tk.END,
+                    values=(
+                        item["product_name"],
+                        item["quantity"],
+                        f"PHP {item['price']:.2f}",
+                        f"PHP {item['subtotal']:.2f}",
+                    ),
+                )
+
+        button_row = ttk.Frame(content)
+        button_row.grid(row=3, column=0, sticky="e", pady=(12, 0))
+        tk.Button(
+            button_row,
+            text="Close",
+            command=modal.destroy,
+            bg="#64748b",
+            fg="white",
+            relief=tk.FLAT,
+            padx=14,
+            pady=6,
+            font=("Segoe UI", 10, "bold"),
+        ).pack(side=tk.RIGHT)
 
     def refresh(self) -> None:
         self._update_filter_buttons()

@@ -72,10 +72,16 @@ def get_customers() -> list[dict]:
 
 
 def delete_customer(name: str) -> bool:
+    if not name:
+        return False
+
     with get_connection() as conn:
+        # Keep debt/customer data consistent by removing both account and its debt rows.
+        conn.execute("DELETE FROM debt_tracker WHERE person_name = ?", (name,))
         conn.execute("DELETE FROM customers WHERE name = ?", (name,))
+        deleted_rows = conn.total_changes
         conn.commit()
-    return True
+    return deleted_rows > 0
 
 
 def get_customer_debts(person_name: str) -> list[dict]:
