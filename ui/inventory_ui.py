@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from core import inventory
 from .theme_manager import ThemeManager
@@ -48,6 +48,7 @@ class InventoryFrame(ttk.Frame):
         self._create_toolbar_button(toolbar, "Show All", self._show_all, "#64748b").pack(side=tk.LEFT)
         self._create_toolbar_button(toolbar, "Untracked Items", self._show_untracked, "#4f46e5").pack(side=tk.LEFT, padx=(8, 0))
         self._create_toolbar_button(toolbar, "Settings", self._open_settings_modal, "#a855f7").pack(side=tk.LEFT, padx=(8, 0))
+        self._create_toolbar_button(toolbar, "Export PDF", self._export_pdf, "#0f766e").pack(side=tk.LEFT, padx=(8, 0))
         self._create_toolbar_button(toolbar, "Create", self._open_create_modal, "#16a34a").pack(side=tk.RIGHT, padx=(8, 0))
         self._create_toolbar_button(toolbar, "Delete", self._open_delete_modal, "#dc2626").pack(side=tk.RIGHT, padx=(8, 0))
         self._create_toolbar_button(toolbar, "Update", self._open_update_modal, "#f59e0b").pack(side=tk.RIGHT, padx=(8, 0))
@@ -161,6 +162,27 @@ class InventoryFrame(ttk.Frame):
     def _show_untracked(self) -> None:
         self.show_only_untracked_var.set(True)
         self.refresh_products(self.search_var.get())
+
+    def _export_pdf(self) -> None:
+        default_name = "inventory_report.pdf"
+        file_path = filedialog.asksaveasfilename(
+            parent=self,
+            title="Save Inventory Report as PDF",
+            defaultextension=".pdf",
+            initialfile=default_name,
+            filetypes=[("PDF files", "*.pdf")],
+        )
+        if not file_path:
+            return
+
+        try:
+            inventory.save_pdf(file_path)
+        except Exception as exc:
+            messagebox.showerror("Export failed", f"Could not save PDF:\n{exc}", parent=self)
+            return
+
+        self.status_var.set(f"Inventory PDF saved to: {file_path}")
+        messagebox.showinfo("Export complete", f"Inventory report saved to:\n{file_path}", parent=self)
 
     def _on_search(self, _event: tk.Event | None = None) -> None:
         self.refresh_products(self.search_var.get())

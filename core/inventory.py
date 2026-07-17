@@ -1,4 +1,11 @@
+from datetime import datetime
+
 from db import database
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 def get_low_stock_threshold() -> int:
@@ -145,3 +152,82 @@ def get_low_stock_products(threshold: int | None = None) -> list[dict]:
     if threshold is None:
         threshold = get_low_stock_threshold()
     return database.get_low_stock_products(threshold)
+
+
+def save_pdf(file_path: str) -> None:
+    products = list_products()
+    summary = database.get_sales_summary()
+
+    document = SimpleDocTemplate(
+        file_path,
+        pagesize=letter,
+        rightMargin=0.5 * inch,
+        leftMargin=0.5 * inch,
+        topMargin=0.6 * inch,
+        bottomMargin=0.5 * inch,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "InventoryTitle",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=22,
+        spaceAfter=8,
+    )
+    body_style = ParagraphStyle(
+        "InventoryBody",
+        parent=styles["BodyText"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=12,
+    )
+
+    story: list = []
+    story.append(Paragraph("Inventory Report", title_style))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", body_style))
+    story.append(Paragraph(f"Products: {summary['product_count']}", body_style))
+    story.append(Paragraph(f"Total Stock: {summary['total_stock']}", body_style))
+    story.append(Paragraph(f"Inventory Value: PHP {summary['inventory_value']:.2f}", body_style))
+    story.append(Spacer(1, 0.2 * inch))
+
+    table_data = [["ID", "Name", "Barcode", "Orig. Price", "Sell Price", "Stock", "Tracked"]]
+    for product in products:
+        table_data.append(
+            [
+                str(product["id"]),
+                Paragraph(product["name"], body_style),
+                Paragraph(product["barcode"] or "-", body_style),
+                f"PHP {float(product['original_price'] or 0):.2f}",
+                f"PHP {float(product['sell_price'] or 0):.2f}",
+                str(product["stock"]),
+                "Yes" if product.get("stock_tracked", False) else "No",
+            ]
+        )
+
+    if len(table_data) == 1:
+        table_data.append(["-", "No products found", "-", "-", "-", "-", "-"])
+
+    table = Table(
+        table_data,
+        repeatRows=1,
+        colWidths=[0.45 * inch, 1.8 * inch, 1.15 * inch, 0.9 * inch, 0.9 * inch, 0.6 * inch, 0.7 * inch],
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1d4ed8")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("LEADING", (0, 0), (-1, -1), 10),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.HexColor("#f8fafc")]),
+            ]
+        )
+    )
+    story.append(table)
+
+    document.build(story)
