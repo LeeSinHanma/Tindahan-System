@@ -1,0 +1,97 @@
+name: Build desktop packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (e.g. 1.0.0)'
+        required: true
+        default: '0.1.0'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: 'requirements*.txt'
+      - name: Install Linux desktop build libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y python3-tk libasound2 libpulse0 xvfb
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Install Windows setup compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (!(Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Test and build Linux
+        if: runner.os == 'Linux'
+        env:
+          BUILD_VERSION: ${{ inputs.version }}
+        run: |
+          xvfb-run -a python -m unittest discover -s tests -v
+          xvfb-run -a python scripts/build.py --version "$BUILD_VERSION"
+      - name: Test and build Windows
+        if: runner.os == 'Windows'
+        env:
+          BUILD_VERSION: ${{ inputs.version }}
+        run: |
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/build.py --version "$env:BUILD_VERSION"
+      - name: Check Windows setup and uninstall
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist/releases/*-setup.exe | Select-Object -First 1).FullName
+          $installDirectory = Join-Path $env:RUNNER_TEMP 'Tindahan Installed'
+          $dataDirectory = Join-Path $env:LOCALAPPDATA 'TindahanSystem'
+          New-Item -ItemType Directory -Force -Path $dataDirectory | Out-Null
+          $marker = Join-Path $dataDirectory 'installer-check.keep'
+          Set-Content -Path $marker -Value 'retain shop data'
+          $process = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=`"$installDirectory`"") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Setup failed: $($process.ExitCode)" }
+          $report = Join-Path $env:RUNNER_TEMP 'installed-smoke.json'
+          $process = Start-Process -FilePath (Join-Path $installDirectory 'POS-System.exe') -ArgumentList @('--smoke-test', "`"$report`"") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'Installed app failed its smoke check' }
+          if (!(Get-Content $report -Raw | ConvertFrom-Json).ok) { throw 'Installed app diagnostics failed' }
+          $process = Start-Process -FilePath (Join-Path $installDirectory 'unins000.exe') -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Uninstall failed: $($process.ExitCode)" }
+          if (Test-Path (Join-Path $installDirectory 'POS-System.exe')) { throw 'Uninstall left the executable behind' }
+          if (!(Test-Path $marker)) { throw 'Uninstall removed user data' }
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: Tindahan-System-${{ runner.os }}
+          path: dist/releases/*
+          if-no-files-found: error
+      - name: Upload bundle diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostics-${{ runner.os }}
+          path: |
+            build/bundle-smoke.json
+            build/installer-smoke.json
+            build/uninstaller-smoke.json
+            build/exclusion-checks.json
+            build/third-party-checks.json
+            build/third-party-inventory-*.json
+            build/POS-System/Analysis-00.toc
+            build/POS-System/COLLECT-00.toc
+            build/POS-System/PKG-00.toc
+          if-no-files-found: ignore

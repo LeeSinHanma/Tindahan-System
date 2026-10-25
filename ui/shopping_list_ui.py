@@ -2,7 +2,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from core import inventory, shopping_list
+from ui import theme as visual
 from ui.theme import get_theme
+from ui.widgets import ActionButton, AdaptivePanels, FlowFrame, page_header, table
 
 
 class ShoppingListFrame(ttk.Frame):
@@ -19,7 +21,9 @@ class ShoppingListFrame(ttk.Frame):
         self.qty_var = tk.StringVar(value="1")
         self.include_done_var = tk.BooleanVar(value=True)
         self.total_var = tk.StringVar(value="Total: PHP 0.00")
-        self.status_var = tk.StringVar(value="Create a shopping list from existing products.")
+        self.status_var = tk.StringVar(
+            value="Create a shopping list from existing products."
+        )
 
         self._build_ui()
         self.refresh()
@@ -32,190 +36,197 @@ class ShoppingListFrame(ttk.Frame):
         top_level.bind("<F7>", self._on_clear_done_hotkey, add="+")
 
     def _build_ui(self) -> None:
-        header = ttk.Frame(self)
-        header.pack(fill=tk.X)
-
-        ttk.Label(header, text="Shopping List", font=("Segoe UI", self.theme.title_large, "bold")).pack(anchor="w")
-        ttk.Label(
-            header,
-            text="Select products, set quantities, and track what to buy.",
-            font=("Segoe UI", self.theme.heading_medium),
-        ).pack(anchor="w", pady=(self.theme.padding_xs, 0))
-
-        controls_box = ttk.LabelFrame(header, text="Hotkeys", padding=8)
-        controls_box.pack(anchor="e", pady=(self.theme.padding_xs, 0))
-
-        controls_row = ttk.Frame(controls_box)
-        controls_row.pack(fill=tk.X)
-
-        def add_hotkey_chip(parent: tk.Widget, key_text: str, action_text: str, color: str) -> None:
-            chip = tk.Frame(parent, bg="#f8fafc", highlightbackground=color, highlightcolor=color, highlightthickness=1, bd=0)
-            chip.pack(side=tk.LEFT, padx=(0, 8))
-
-            key_label = tk.Label(
-                chip,
-                text=key_text,
-                bg=color,
-                fg="white",
-                font=("Segoe UI", self.theme.body_small, "bold"),
-                padx=8,
-                pady=2,
-            )
-            key_label.pack(side=tk.LEFT)
-
-            action_label = tk.Label(
-                chip,
-                text=action_text,
-                bg="#f8fafc",
-                fg="#0f172a",
-                font=("Segoe UI", self.theme.body_small, "bold"),
-                padx=8,
-                pady=2,
-            )
-            action_label.pack(side=tk.LEFT)
-
-        add_hotkey_chip(controls_row, "F1", "Select All", "#2563eb")
-        add_hotkey_chip(controls_row, "F2", "Clear Sel.", "#64748b")
-        add_hotkey_chip(controls_row, "F3", "Mark Done", "#0ea5e9")
-        add_hotkey_chip(controls_row, "F4", "Mark Pending", "#475569")
-        add_hotkey_chip(controls_row, "F5", "Remove", "#dc2626")
-        add_hotkey_chip(controls_row, "F6", "Set Qty", "#1d4ed8")
-        add_hotkey_chip(controls_row, "F7", "Clear Done", "#b45309")
-
-        content = ttk.Frame(self)
-        content.pack(fill=tk.BOTH, expand=True, pady=(self.theme.gap_medium, 0))
-        content.columnconfigure(0, weight=1)
-        content.columnconfigure(1, weight=2)
-        content.rowconfigure(0, weight=1)
-
-        self._build_product_panel(content)
-        self._build_list_panel(content)
-
-        footer = ttk.Frame(self)
-        footer.pack(fill=tk.X, pady=(self.theme.padding_small, 0))
-        ttk.Label(footer, textvariable=self.status_var).pack(side=tk.LEFT)
-
-    def _create_button(self, parent: tk.Widget, text: str, command, color: str) -> tk.Button:
-        return tk.Button(
-            parent,
-            text=text,
-            command=command,
-            bg=color,
-            fg="white",
-            activebackground=color,
-            activeforeground="white",
-            relief=tk.FLAT,
-            padx=self.theme.button_padx_small,
-            pady=self.theme.button_pady_small,
-            font=("Segoe UI", self.theme.body_small, "bold"),
-            cursor="hand2",
+        self.configure(padding=0)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
+        page_header(
+            self,
+            "Shopping List",
+            "Plan your next restock. Add products, set quantities, and track purchases.",
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 16))
+        self.panels = AdaptivePanels(self)
+        self.panels.grid(row=1, column=0, sticky="nsew")
+        self._build_product_panel(self.panels.add("Find products"))
+        self._build_list_panel(self.panels.add("Shopping list"))
+        status = ttk.Label(
+            self, textvariable=self.status_var, style="Muted.TLabel", wraplength=700
+        )
+        status.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        self.bind(
+            "<Configure>",
+            lambda e: status.configure(wraplength=max(200, e.width)),
+            add="+",
         )
 
-    def _build_product_panel(self, parent: ttk.Frame) -> None:
-        panel = ttk.LabelFrame(parent, text="Products", padding=self.theme.padding_medium)
-        panel.grid(row=0, column=0, sticky="nsew", padx=(0, self.theme.gap_medium))
+    def _build_product_panel(self, panel) -> None:
         panel.columnconfigure(0, weight=1)
         panel.rowconfigure(2, weight=1)
-
-        search_row = ttk.Frame(panel)
-        search_row.grid(row=0, column=0, sticky="ew", pady=(0, self.theme.gap_medium))
-        search_row.columnconfigure(0, weight=1)
-
-        entry = ttk.Entry(search_row, textvariable=self.product_search_var)
+        ttk.Label(panel, text="Products", style="Section.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 12)
+        )
+        search = ttk.Frame(panel)
+        search.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        search.columnconfigure(0, weight=1)
+        entry = ttk.Entry(search, textvariable=self.product_search_var, width=12)
         entry.grid(row=0, column=0, sticky="ew")
         entry.bind("<Return>", self._search_products)
-
-        self._create_button(search_row, "Search", self._search_products, "#1d4ed8").grid(row=0, column=1, padx=(6, 0))
-
-        columns = ("pick", "id", "name", "price")
-        self.product_table = ttk.Treeview(panel, columns=columns, show="headings", height=self.theme.table_height_large)
-        self.product_table.heading("pick", text="Pick")
-        self.product_table.heading("id", text="ID")
-        self.product_table.heading("name", text="Product")
-        self.product_table.heading("price", text="Orig. Price")
-
-        self.product_table.column("pick", width=48, anchor=tk.CENTER)
-        self.product_table.column("id", width=48, anchor=tk.CENTER)
-        self.product_table.column("name", width=self.theme.table_column_width_name)
-        self.product_table.column("price", width=self.theme.table_column_width_price, anchor=tk.E)
-        self.product_table.grid(row=2, column=0, sticky="nsew")
-
-        product_scroll = ttk.Scrollbar(panel, orient=tk.VERTICAL, command=self.product_table.yview)
-        product_scroll.grid(row=2, column=1, sticky="ns")
-        self.product_table.configure(yscrollcommand=product_scroll.set)
+        ActionButton(search, text="Search", command=self._search_products).grid(
+            row=0, column=1, padx=(6, 0)
+        )
+        box, self.product_table = table(
+            panel,
+            ("pick", "id", "name", "price"),
+            ("Pick", "ID", "Product", "Cost"),
+            (45, 44, 180, 80),
+            displaycolumns=("pick", "name", "price"),
+            empty_text="No matching products. Add products in Inventory first.",
+            height=4,
+        )
+        box.grid(row=2, column=0, sticky="nsew")
         self.product_table.bind("<<TreeviewSelect>>", self._on_product_select)
         self.product_table.bind("<Button-1>", self._toggle_product_check)
+        self.product_table.bind("<space>", self._toggle_product_keyboard)
+        actions = FlowFrame(panel)
+        actions.grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        actions.add(ttk.Label(actions, text="Quantity"))
+        qty = actions.add(ttk.Entry(actions, textvariable=self.qty_var, width=4))
+        qty.bind("<Return>", self._add_checked_to_list_event)
+        self.add_products_button = actions.add(
+            ActionButton(
+                actions,
+                text="Add selected",
+                variant="Primary",
+                command=self._add_checked_to_list,
+                state="disabled",
+            )
+        )
+        actions.add(
+            ActionButton(
+                actions, text="Add low stock", command=self._add_low_stock_items
+            )
+        )
 
-        add_row = ttk.Frame(panel)
-        add_row.grid(row=3, column=0, sticky="ew", pady=(self.theme.gap_medium, 0))
+    def _add_checked_to_list_event(self, event=None):
+        self._add_checked_to_list()
 
-        ttk.Label(add_row, text="Qty:").pack(side=tk.LEFT)
-        qty_entry = ttk.Entry(add_row, textvariable=self.qty_var, width=5, justify=tk.CENTER)
-        qty_entry.pack(side=tk.LEFT, padx=(6, 8))
-        qty_entry.bind("<Return>", self._add_to_list)
+    def _toggle_product_keyboard(self, event=None):
+        selected = self.product_table.selection()
+        if selected:
+            product_id = int(self.product_table.item(selected[0], "values")[1])
+            if product_id in self.checked_product_ids:
+                self.checked_product_ids.remove(product_id)
+            else:
+                self.checked_product_ids.add(product_id)
+            self.product_table.set(
+                selected[0],
+                "pick",
+                "[x]" if product_id in self.checked_product_ids else "[ ]",
+            )
+            self._update_selection_actions()
+        return "break"
 
-        self._create_button(add_row, "Add To List", self._add_to_list, "#16a34a").pack(side=tk.LEFT)
-        self._create_button(add_row, "Add Checked", self._add_checked_to_list, "#0f766e").pack(side=tk.LEFT, padx=(6, 0))
-        self._create_button(add_row, "Add Low Stock", self._add_low_stock_items, "#7c3aed").pack(side=tk.LEFT, padx=(6, 0))
-
-    def _build_list_panel(self, parent: ttk.Frame) -> None:
-        panel = ttk.LabelFrame(parent, text="Current Shopping List", padding=self.theme.padding_medium)
-        panel.grid(row=0, column=1, sticky="nsew")
+    def _build_list_panel(self, panel) -> None:
+        self.list_panel = panel
         panel.columnconfigure(0, weight=1)
-        panel.rowconfigure(1, weight=1)
-
-        top_row = ttk.Frame(panel)
-        top_row.grid(row=0, column=0, sticky="ew", pady=(0, self.theme.gap_medium))
-
-        ttk.Checkbutton(
-            top_row,
-            text="Show completed",
-            variable=self.include_done_var,
-            command=self.refresh,
-        ).pack(side=tk.LEFT)
-
-        ttk.Label(top_row, textvariable=self.total_var, font=("Segoe UI", self.theme.body_medium, "bold")).pack(side=tk.RIGHT, padx=(8, 0))
-
-        self._create_button(top_row, "Refresh", self.refresh, "#64748b").pack(side=tk.RIGHT)
-        self._create_button(top_row, "Save PDF", self._save_pdf, "#0f766e").pack(side=tk.RIGHT, padx=(6, 0))
-        self._create_button(top_row, "Remove All", self._remove_all, "#dc2626").pack(side=tk.RIGHT, padx=(6, 0))
-
-        columns = ("pick", "id", "name", "original_price", "qty", "status")
-        self.list_table = ttk.Treeview(panel, columns=columns, show="headings", height=self.theme.table_height_large)
-        self.list_table.heading("pick", text="✓")
-        self.list_table.heading("id", text="ID")
-        self.list_table.heading("name", text="Product")
-        self.list_table.heading("original_price", text="Price")
-        self.list_table.heading("qty", text="Qty")
-        self.list_table.heading("status", text="Status")
-
-        self.list_table.column("pick", width=40, anchor=tk.CENTER)
-        self.list_table.column("id", width=self.theme.table_column_width_id, anchor=tk.CENTER)
-        self.list_table.column("name", width=self.theme.table_column_width_name, anchor=tk.W)
-        self.list_table.column("original_price", width=self.theme.table_column_width_price, anchor=tk.E)
-        self.list_table.column("qty", width=self.theme.table_column_width_qty, anchor=tk.CENTER)
-        self.list_table.column("status", width=self.theme.table_column_width_status, anchor=tk.CENTER)
-        self.list_table.grid(row=1, column=0, sticky="nsew")
-
-        list_scroll = ttk.Scrollbar(panel, orient=tk.VERTICAL, command=self.list_table.yview)
-        list_scroll.grid(row=1, column=1, sticky="ns")
-        self.list_table.configure(yscrollcommand=list_scroll.set)
+        panel.rowconfigure(3, weight=1)
+        ttk.Label(panel, text="Restock list", style="Section.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 8)
+        )
+        ttk.Label(
+            panel, textvariable=self.total_var, font=(visual.FONT, 16, "bold")
+        ).grid(row=1, column=0, sticky="w", pady=(0, 8))
+        toolbar = FlowFrame(panel)
+        toolbar.grid(row=2, column=0, sticky="ew", pady=(0, 4))
+        toolbar.add(
+            ttk.Checkbutton(
+                toolbar,
+                text="Show completed",
+                variable=self.include_done_var,
+                command=self.refresh,
+            )
+        )
+        toolbar.add(ActionButton(toolbar, text="Save PDF", command=self._save_pdf))
+        more = ttk.Menubutton(toolbar, text="More")
+        menu = tk.Menu(more, tearoff=False)
+        for label, command in [
+            ("Select all · F1", self._select_all_list_items),
+            ("Clear selection · F2", self._clear_list_selection),
+            ("Set quantity · F6", self._set_selected_qty),
+            ("Clear completed · F7", self._clear_done_items),
+            ("Remove all items", self._remove_all),
+            ("Refresh", self.refresh),
+        ]:
+            menu.add_command(label=label, command=command)
+        more.configure(menu=menu)
+        toolbar.add(more)
+        box, self.list_table = table(
+            panel,
+            ("pick", "id", "name", "original_price", "qty", "status"),
+            ("Pick", "ID", "Product", "Cost", "Qty", "Status"),
+            (45, 44, 180, 80, 45, 85),
+            displaycolumns=("pick", "name", "original_price", "qty", "status"),
+            empty_text="Your restock list is empty. Add products from Find products.",
+            height=4,
+        )
+        box.grid(row=3, column=0, sticky="nsew")
         self.list_table.bind("<<TreeviewSelect>>", self._on_list_item_select)
         self.list_table.bind("<Button-1>", self._toggle_list_item_check)
+        self.list_table.bind("<space>", self._toggle_list_keyboard)
+        actions = FlowFrame(panel)
+        actions.grid(row=4, column=0, sticky="ew", pady=(8, 0))
+        self.list_action_buttons = [
+            actions.add(
+                ActionButton(
+                    actions,
+                    text="Mark purchased · F3",
+                    command=lambda: self._mark_selected_done(True),
+                    state="disabled",
+                )
+            ),
+            actions.add(
+                ActionButton(
+                    actions,
+                    text="Mark pending · F4",
+                    command=lambda: self._mark_selected_done(False),
+                    state="disabled",
+                )
+            ),
+            actions.add(
+                ActionButton(
+                    actions,
+                    text="Remove · F5",
+                    variant="Danger",
+                    command=self._remove_selected,
+                    state="disabled",
+                )
+            ),
+        ]
 
-        controls_note = ttk.Label(
-            panel,
-            text="Use the hotkeys above to manage selected shopping-list items.",
-            foreground="#64748b",
-            font=("Segoe UI", self.theme.body_small, "bold"),
-        )
-        controls_note.grid(row=2, column=0, sticky="w", pady=(self.theme.gap_medium, 0))
+    def _toggle_list_keyboard(self, event=None):
+        selected = self.list_table.selection()
+        if selected:
+            item_id = int(self.list_table.item(selected[0], "values")[1])
+            if item_id in self.checked_list_item_ids:
+                self.checked_list_item_ids.remove(item_id)
+            else:
+                self.checked_list_item_ids.add(item_id)
+            self.list_table.set(
+                selected[0],
+                "pick",
+                "[x]" if item_id in self.checked_list_item_ids else "[ ]",
+            )
+            self._update_selection_actions()
+        return "break"
 
     def _search_products(self, _event: tk.Event | None = None) -> None:
         self._load_products(self.product_search_var.get())
 
     def _load_products(self, search_term: str = "") -> None:
-        products = inventory.search_products(search_term) if search_term.strip() else inventory.list_products()
+        products = (
+            inventory.search_products(search_term)
+            if search_term.strip()
+            else inventory.list_products()
+        )
         visible_product_ids = {int(product["id"]) for product in products}
         self.checked_product_ids.intersection_update(visible_product_ids)
 
@@ -236,6 +247,13 @@ class ShoppingListFrame(ttk.Frame):
                     f"{product['original_price']:.2f}",
                 ),
             )
+
+        selected = f"p{self.selected_product_id}"
+        if self.product_table.exists(selected):
+            self.product_table.selection_set(selected)
+        else:
+            self.selected_product_id = None
+        self._update_selection_actions()
 
     def _load_list_items(self) -> None:
         items = shopping_list.list_items(self.include_done_var.get())
@@ -266,7 +284,13 @@ class ShoppingListFrame(ttk.Frame):
 
         self.list_table.tag_configure("done", background="#dcfce7")
         self.total_var.set(f"Total: PHP {shopping_list.get_total():.2f}")
-        self.status_var.set(f"Shopping list items loaded: {len(items)}")
+        self.status_var.set(f"{len(items)} items on your restock list")
+        selected = f"s{self.selected_list_item_id}"
+        if self.list_table.exists(selected):
+            self.list_table.selection_set(selected)
+        else:
+            self.selected_list_item_id = None
+        self._update_selection_actions()
 
     def _add_low_stock_items(self) -> None:
         added_count = shopping_list.add_low_stock_items()
@@ -276,19 +300,34 @@ class ShoppingListFrame(ttk.Frame):
         self._load_list_items()
         self.status_var.set(f"Added {added_count} low-stock item(s) to shopping list")
 
-    def _on_product_select(self, _event: tk.Event) -> None:
+    def _on_product_select(self, _event=None) -> None:
         selected = self.product_table.selection()
-        if not selected:
-            self.selected_product_id = None
-            return
-        self.selected_product_id = int(self.product_table.item(selected[0], "values")[1])
+        self.selected_product_id = (
+            int(self.product_table.item(selected[0], "values")[1]) if selected else None
+        )
+        self._update_selection_actions()
 
-    def _on_list_item_select(self, _event: tk.Event) -> None:
+    def _update_selection_actions(self):
+        state = (
+            "normal"
+            if self.checked_product_ids or self.selected_product_id is not None
+            else "disabled"
+        )
+        self.add_products_button.configure(state=state)
+        state = (
+            "normal"
+            if self.checked_list_item_ids or self.selected_list_item_id is not None
+            else "disabled"
+        )
+        for button in self.list_action_buttons:
+            button.configure(state=state)
+
+    def _on_list_item_select(self, _event=None) -> None:
         selected = self.list_table.selection()
-        if not selected:
-            self.selected_list_item_id = None
-            return
-        self.selected_list_item_id = int(self.list_table.item(selected[0], "values")[1])
+        self.selected_list_item_id = (
+            int(self.list_table.item(selected[0], "values")[1]) if selected else None
+        )
+        self._update_selection_actions()
 
     def _toggle_product_check(self, event: tk.Event) -> str | None:
         row_id = self.product_table.identify_row(event.y)
@@ -327,19 +366,6 @@ class ShoppingListFrame(ttk.Frame):
 
         self._load_list_items()
         return "break"
-
-    def _select_all_list_items(self) -> None:
-        self.checked_list_item_ids = {
-            int(self.list_table.item(row_id, "values")[1])
-            for row_id in self.list_table.get_children()
-        }
-        self._load_list_items()
-        self.status_var.set(f"Selected {len(self.checked_list_item_ids)} shopping-list item(s)")
-
-    def _clear_list_selection(self) -> None:
-        self.checked_list_item_ids.clear()
-        self._load_list_items()
-        self.status_var.set("Shopping-list selection cleared")
 
     def _shopping_list_hotkey_active(self) -> bool:
         return getattr(self.winfo_toplevel(), "active_screen", None) == "shopping_list"
@@ -418,7 +444,9 @@ class ShoppingListFrame(ttk.Frame):
     def _add_checked_to_list(self) -> None:
         product_ids = self._target_product_ids()
         if not product_ids:
-            messagebox.showerror("Invalid input", "Select or check product(s) first", parent=self)
+            messagebox.showerror(
+                "Invalid input", "Select or check product(s) first", parent=self
+            )
             return
 
         added_count = 0
@@ -439,7 +467,11 @@ class ShoppingListFrame(ttk.Frame):
     def _set_selected_qty(self) -> None:
         item_ids = self._target_list_item_ids()
         if not item_ids:
-            messagebox.showerror("Invalid input", "Select or check shopping-list item(s) first", parent=self)
+            messagebox.showerror(
+                "Invalid input",
+                "Select or check shopping-list item(s) first",
+                parent=self,
+            )
             return
 
         for item_id in item_ids:
@@ -457,7 +489,11 @@ class ShoppingListFrame(ttk.Frame):
     def _mark_selected_done(self, is_done: bool) -> None:
         item_ids = self._target_list_item_ids()
         if not item_ids:
-            messagebox.showerror("Invalid input", "Select or check shopping-list item(s) first", parent=self)
+            messagebox.showerror(
+                "Invalid input",
+                "Select or check shopping-list item(s) first",
+                parent=self,
+            )
             return
 
         for item_id in item_ids:
@@ -470,7 +506,11 @@ class ShoppingListFrame(ttk.Frame):
     def _remove_selected(self) -> None:
         item_ids = self._target_list_item_ids()
         if not item_ids:
-            messagebox.showerror("Invalid input", "Select or check shopping-list item(s) first", parent=self)
+            messagebox.showerror(
+                "Invalid input",
+                "Select or check shopping-list item(s) first",
+                parent=self,
+            )
             return
 
         for item_id in item_ids:

@@ -2,20 +2,27 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from core import inventory
-from .theme_manager import ThemeManager
+from ui import theme as visual
+from ui.widgets import (
+    ActionButton,
+    FlowFrame,
+    ScrollFrame,
+    center_dialog,
+    page_header,
+    table,
+)
 
 
 class InventoryFrame(ttk.Frame):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master, padding=14)
         top_level = master.winfo_toplevel()
-        screen_w = top_level.winfo_screenwidth()
-        screen_h = top_level.winfo_screenheight()
-        self.compact_layout = screen_w < 1400 or screen_h < 820
-        self.theme = ThemeManager(self.compact_layout)
+        self.theme = visual.get_theme()
         self.selected_product_id: int | None = None
         self.search_var = tk.StringVar()
-        self.status_var = tk.StringVar(value="Select a product, then use Create / Update / Delete")
+        self.status_var = tk.StringVar(
+            value="Select a product, then use Create / Update / Delete"
+        )
         self.show_only_untracked_var = tk.BooleanVar(value=False)
         self.search_entry: ttk.Entry | None = None
 
@@ -28,126 +35,104 @@ class InventoryFrame(ttk.Frame):
         top_level.bind("<F5>", self._on_settings_hotkey, add="+")
 
     def _build_ui(self) -> None:
-        header = ttk.Frame(self)
-        header.pack(fill=tk.X)
-
-        header_top = ttk.Frame(header)
-        header_top.pack(fill=tk.X)
-
-        title_block = ttk.Frame(header_top)
-        title_block.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        ttk.Label(title_block, text="Inventory CRUD", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
-        ttk.Label(
-            title_block,
-            text="Create products from a modal form, update stock with hotkeys, or delete with confirmation.",
-            font=("Segoe UI", self.theme.body_medium),
-        ).pack(anchor="w", pady=(4, 0))
-
-        hotkeys_box = ttk.LabelFrame(header_top, text="Hotkeys", padding=8)
-        hotkeys_box.pack(side=tk.RIGHT, anchor="n")
-
-        hotkeys_row = ttk.Frame(hotkeys_box)
-        hotkeys_row.pack(fill=tk.X)
-
-        def add_hotkey_chip(parent: tk.Widget, key_text: str, action_text: str, color: str) -> None:
-            chip = tk.Frame(parent, bg="#f8fafc", highlightbackground=color, highlightcolor=color, highlightthickness=1, bd=0)
-            chip.pack(side=tk.LEFT, padx=(0, 8))
-
-            key_label = tk.Label(
-                chip,
-                text=key_text,
-                bg=color,
-                fg="white",
-                font=("Segoe UI", self.theme.body_small, "bold"),
-                padx=8,
-                pady=2,
+        self.configure(padding=0)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(3, weight=1)
+        page_header(
+            self, "Inventory", "Manage products, prices, and stock levels."
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 16))
+        actions = FlowFrame(self)
+        actions.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        actions.add(
+            ActionButton(
+                actions,
+                text="Add product · F1",
+                variant="Primary",
+                command=self._open_create_modal,
             )
-            key_label.pack(side=tk.LEFT)
-
-            action_label = tk.Label(
-                chip,
-                text=action_text,
-                bg="#f8fafc",
-                fg="#0f172a",
-                font=("Segoe UI", self.theme.body_small, "bold"),
-                padx=8,
-                pady=2,
+        )
+        self.edit_button = actions.add(
+            ActionButton(
+                actions,
+                text="Edit · F2",
+                command=self._open_update_modal,
+                state="disabled",
             )
-            action_label.pack(side=tk.LEFT)
-
-        add_hotkey_chip(hotkeys_row, "F1", "Create", "#16a34a")
-        add_hotkey_chip(hotkeys_row, "F2", "Update", "#f59e0b")
-        add_hotkey_chip(hotkeys_row, "F3", "Delete", "#dc2626")
-        add_hotkey_chip(hotkeys_row, "F4", "Restock", "#0ea5e9")
-        add_hotkey_chip(hotkeys_row, "F5", "Settings", "#a855f7")
-
-        toolbar = ttk.Frame(self)
-        toolbar.pack(fill=tk.X, pady=(12, 10))
-
-        search_row = ttk.Frame(toolbar)
-        search_row.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        ttk.Label(search_row, text="Search name / barcode:", font=("Segoe UI", 13, "bold")).pack(side=tk.LEFT)
-        self.search_entry = ttk.Entry(search_row, textvariable=self.search_var, font=("Segoe UI", 13))
-        self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 8))
+        )
+        actions.add(
+            ActionButton(actions, text="Restock · F4", command=self._open_restock_modal)
+        )
+        more = ttk.Menubutton(actions, text="More actions", direction="below")
+        menu = tk.Menu(more, tearoff=False)
+        menu.add_command(label="Export inventory PDF", command=self._export_pdf)
+        menu.add_command(
+            label="Inventory settings · F5", command=self._open_settings_modal
+        )
+        menu.add_separator()
+        menu.add_command(
+            label="Delete selected product · F3", command=self._open_delete_modal
+        )
+        more.configure(menu=menu)
+        actions.add(more)
+        search = ttk.Frame(self)
+        search.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+        search.columnconfigure(0, weight=1)
+        self.search_entry = ttk.Entry(search, textvariable=self.search_var)
+        self.search_entry.grid(row=1, column=0, sticky="ew")
+        ttk.Label(search, text="Search name or barcode", style="Muted.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 4)
+        )
         self.search_entry.bind("<Return>", self._on_search)
-
-        self._create_toolbar_button(toolbar, "Search", self._on_search, "#1d4ed8").pack(side=tk.LEFT, padx=(0, 8))
-        self._create_toolbar_button(toolbar, "Show All", self._show_all, "#64748b").pack(side=tk.LEFT)
-        self._create_toolbar_button(toolbar, "Untracked Items", self._show_untracked, "#4f46e5").pack(side=tk.LEFT, padx=(8, 0))
-        self._create_toolbar_button(toolbar, "Export PDF", self._export_pdf, "#0f766e").pack(side=tk.LEFT, padx=(8, 0))
-
-        table_box = ttk.Frame(self)
-        table_box.pack(fill=tk.BOTH, expand=True)
-
-        columns = ("id", "name", "barcode", "original_price", "sell_price", "stock", "tracked")
-        self.product_table = ttk.Treeview(table_box, columns=columns, show="headings", height=20)
-        self.product_table.heading("id", text="ID")
-        self.product_table.heading("name", text="Name")
-        self.product_table.heading("barcode", text="Barcode")
-        self.product_table.heading("original_price", text="Orig. Price")
-        self.product_table.heading("sell_price", text="Sell Price")
-        self.product_table.heading("stock", text="Stock")
-        self.product_table.heading("tracked", text="Tracked")
-
-        self.product_table.column("id", width=45, anchor=tk.CENTER)
-        self.product_table.column("name", width=160, anchor=tk.W)
-        self.product_table.column("barcode", width=100, anchor=tk.W)
-        self.product_table.column("original_price", width=75, anchor=tk.E)
-        self.product_table.column("sell_price", width=75, anchor=tk.E)
-        self.product_table.column("stock", width=60, anchor=tk.CENTER)
-        self.product_table.column("tracked", width=60, anchor=tk.CENTER)
-        self.product_table.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
-
-        scrollbar = ttk.Scrollbar(table_box, orient=tk.VERTICAL, command=self.product_table.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.product_table.configure(yscrollcommand=scrollbar.set)
-
-        self.product_table.tag_configure("low_stock", background="#fff2cc")
-        self.product_table.tag_configure("untracked", background="#e0e7ff")
+        ActionButton(search, text="Search", command=self._on_search).grid(
+            row=1, column=1, padx=8
+        )
+        self.filter_var = tk.StringVar(value="All products")
+        filters = ttk.Combobox(
+            search,
+            textvariable=self.filter_var,
+            values=("All products", "Low stock", "Out of stock", "Untracked"),
+            state="readonly",
+            width=16,
+        )
+        filters.grid(row=1, column=2)
+        filters.bind("<<ComboboxSelected>>", lambda e: self._apply_filter())
+        box, self.product_table = table(
+            self,
+            (
+                "id",
+                "name",
+                "barcode",
+                "original_price",
+                "sell_price",
+                "stock",
+                "tracked",
+            ),
+            ("ID", "Product", "Barcode", "Cost", "Sell price", "Stock", "Status"),
+            (44, 220, 150, 85, 85, 60, 110),
+            displaycolumns=(
+                "name",
+                "barcode",
+                "original_price",
+                "sell_price",
+                "stock",
+                "tracked",
+            ),
+            empty_text="No products yet. Add your first product above.",
+            height=6,
+        )
+        box.grid(row=3, column=0, sticky="nsew")
+        self.product_table.tag_configure("low_stock", background="#fffbeb")
+        self.product_table.tag_configure("out_of_stock", background="#fff1f2")
+        self.product_table.tag_configure("untracked", foreground=visual.MUTED)
         self.product_table.bind("<<TreeviewSelect>>", self._on_row_select)
         self.product_table.bind("<Double-1>", self._open_update_modal)
-
-        footer = ttk.Frame(self)
-        footer.pack(fill=tk.X, pady=(8, 0))
-        ttk.Label(footer, textvariable=self.status_var).pack(side=tk.LEFT)
-
-    def _create_toolbar_button(self, parent: tk.Widget, text: str, command, color: str) -> tk.Button:
-        return tk.Button(
-            parent,
-            text=text,
-            command=command,
-            bg=color,
-            fg="white",
-            activebackground=color,
-            activeforeground="white",
-            relief=tk.FLAT,
-            padx=self.theme.button_padding_x,
-            pady=self.theme.button_padding_y,
-            font=("Segoe UI", self.theme.body_medium, "bold"),
-            cursor="hand2",
+        ttk.Label(self, textvariable=self.status_var, style="Muted.TLabel").grid(
+            row=4, column=0, sticky="w", pady=(8, 0)
         )
+
+    def _apply_filter(self):
+        self.show_only_untracked_var.set(self.filter_var.get() == "Untracked")
+        self.refresh_products()
 
     def _on_create_hotkey(self, _event: tk.Event | None = None) -> str:
         if getattr(self.winfo_toplevel(), "active_screen", None) != "inventory":
@@ -179,11 +164,13 @@ class InventoryFrame(ttk.Frame):
         self._open_settings_modal()
         return "break"
 
-    def _open_modal_shell(self, title: str, width: int = 520, height: int = 420) -> tk.Toplevel:
+    def _open_modal_shell(
+        self, title: str, width: int = 520, height: int = 420
+    ) -> tk.Toplevel:
         modal = tk.Toplevel(self)
         modal.title(title)
         modal.geometry(f"{width}x{height}")
-        modal.resizable(False, False)
+        modal.resizable(True, True)
         modal.transient(self.winfo_toplevel())
         modal.update_idletasks()
         modal.lift()
@@ -199,32 +186,25 @@ class InventoryFrame(ttk.Frame):
         modal.grab_set()
         return modal
 
-    def _center_modal(self, modal: tk.Toplevel, width: int, height: int) -> None:
-        modal.update_idletasks()
-        screen_w = modal.winfo_screenwidth()
-        screen_h = modal.winfo_screenheight()
-        pos_x = max((screen_w - width) // 2, 0)
-        pos_y = max((screen_h - height) // 2, 0)
-        modal.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
+    def _center_modal(self, modal, width, height):
+        center_dialog(modal, width, height)
 
-    def _field_row(self, parent: tk.Widget, label_text: str, variable: tk.StringVar, row: int) -> ttk.Entry:
-        ttk.Label(parent, text=label_text).grid(row=row, column=0, sticky="w", pady=6, padx=(0, 10))
+    def _field_row(
+        self, parent: tk.Widget, label_text: str, variable: tk.StringVar, row: int
+    ) -> ttk.Entry:
+        ttk.Label(parent, text=label_text).grid(
+            row=row, column=0, sticky="w", pady=6, padx=(0, 10)
+        )
         entry = ttk.Entry(parent, textvariable=variable)
         entry.grid(row=row, column=1, sticky="ew", pady=6)
         return entry
 
-    def _product_payload(self) -> dict:
-        return {
-            "name": self._create_vars["name"].get(),
-            "description": self._create_vars["description"].get(),
-            "barcode": self._create_vars["barcode"].get(),
-            "original_price": self._create_vars["original_price"].get(),
-            "sell_price": self._create_vars["sell_price"].get(),
-            "stock": self._create_vars["stock"].get(),
-            "stock_tracked": self._create_vars["stock_tracked"].get(),
-        }
-
-    def _resolve_parent_link(self, current_product_id: int | None, current_barcode: str, vars_map: dict[str, tk.Variable]) -> dict:
+    def _resolve_parent_link(
+        self,
+        current_product_id: int | None,
+        current_barcode: str,
+        vars_map: dict[str, tk.Variable],
+    ) -> dict:
         if not bool(vars_map["parent_linked"].get()):
             return {"parent_product_id": None, "parent_units": 1}
 
@@ -236,7 +216,10 @@ class InventoryFrame(ttk.Frame):
         if parent_product is None:
             raise ValueError("Parent product not found")
 
-        if current_product_id is not None and parent_product["id"] == current_product_id:
+        if (
+            current_product_id is not None
+            and parent_product["id"] == current_product_id
+        ):
             raise ValueError("A product cannot be its own parent")
 
         if current_barcode and parent_product["barcode"] == current_barcode:
@@ -258,13 +241,13 @@ class InventoryFrame(ttk.Frame):
         return inventory.get_product_by_id(self.selected_product_id)
 
     def _show_all(self) -> None:
-        self.show_only_untracked_var.set(False)
+        self.filter_var.set("All products")
         self.search_var.set("")
-        self.refresh_products()
+        self._apply_filter()
 
     def _show_untracked(self) -> None:
-        self.show_only_untracked_var.set(True)
-        self.refresh_products(self.search_var.get())
+        self.filter_var.set("Untracked")
+        self._apply_filter()
 
     def _export_pdf(self) -> None:
         file_path = filedialog.asksaveasfilename(
@@ -280,11 +263,15 @@ class InventoryFrame(ttk.Frame):
         try:
             inventory.save_pdf(file_path)
         except Exception as exc:
-            messagebox.showerror("Export failed", f"Could not save PDF:\n{exc}", parent=self)
+            messagebox.showerror(
+                "Export failed", f"Could not save PDF:\n{exc}", parent=self
+            )
             return
 
         self.status_var.set(f"Inventory PDF saved to: {file_path}")
-        messagebox.showinfo("Export complete", f"Inventory report saved to:\n{file_path}", parent=self)
+        messagebox.showinfo(
+            "Export complete", f"Inventory report saved to:\n{file_path}", parent=self
+        )
 
     def _on_search(self, _event: tk.Event | None = None) -> None:
         self.refresh_products(self.search_var.get())
@@ -293,773 +280,588 @@ class InventoryFrame(ttk.Frame):
         if self.search_entry:
             self.search_entry.focus()
 
-    def _on_row_select(self, _event: tk.Event) -> None:
+    def _on_row_select(self, _event=None) -> None:
         selected = self.product_table.selection()
         self.selected_product_id = int(selected[0]) if selected else None
+        self.edit_button.configure(state="normal" if selected else "disabled")
 
-    def refresh_products(self, search_term: str | None = None) -> None:
+    def refresh_products(self, search_term=None) -> None:
         term = self.search_var.get() if search_term is None else search_term
-        if self.show_only_untracked_var.get():
-            products = inventory.get_untracked_products(term)
-        else:
-            products = inventory.search_products(term) if term.strip() else inventory.list_products()
-
-        for row_id in self.product_table.get_children():
-            self.product_table.delete(row_id)
-
+        products = (
+            inventory.search_products(term)
+            if term.strip()
+            else inventory.list_products()
+        )
+        threshold = inventory.get_low_stock_threshold()
+        filter_name = self.filter_var.get()
+        if filter_name == "Untracked":
+            products = [p for p in products if not p.get("stock_tracked")]
+        elif filter_name == "Low stock":
+            products = [
+                p
+                for p in products
+                if p.get("stock_tracked") and 0 < p["stock"] <= threshold
+            ]
+        elif filter_name == "Out of stock":
+            products = [
+                p for p in products if p.get("stock_tracked") and p["stock"] <= 0
+            ]
+        selected = str(self.selected_product_id) if self.selected_product_id else None
+        self.product_table.delete(*self.product_table.get_children())
+        self.product_table.empty_text = (
+            "No matching products. Try a different search or filter."
+            if term or filter_name != "All products"
+            else "No products yet. Add your first product above."
+        )
+        self.product_table._refresh_empty()
         for product in products:
-            if not product.get("stock_tracked", False):
-                tags = ("untracked",)
-            else:
-                tags = ("low_stock",) if product["stock"] <= inventory.get_low_stock_threshold() else ()
+            tracked = product.get("stock_tracked", False)
+            status = (
+                "Untracked"
+                if not tracked
+                else "Out of stock"
+                if product["stock"] <= 0
+                else "Low stock"
+                if product["stock"] <= threshold
+                else "In stock"
+            )
+            tag = (
+                "untracked"
+                if not tracked
+                else "out_of_stock"
+                if product["stock"] <= 0
+                else "low_stock"
+                if product["stock"] <= threshold
+                else ""
+            )
             self.product_table.insert(
                 "",
-                tk.END,
+                "end",
                 iid=str(product["id"]),
                 values=(
                     product["id"],
                     product["name"],
                     product["barcode"],
-                    f"{product['original_price']:.2f}",
-                    f"{product['sell_price']:.2f}",
-                    product["stock"],
-                    "Yes" if product.get("stock_tracked", False) else "No",
+                    f"{product['original_price']:,.2f}",
+                    f"{product['sell_price']:,.2f}",
+                    product["stock"] if tracked else "—",
+                    status,
                 ),
-                tags=tags,
+                tags=(tag,),
             )
-
-        low_stock_count = len(inventory.get_low_stock_products())
-        self.status_var.set(f"Loaded {len(products)} products. Low stock: {low_stock_count}")
+        if selected and self.product_table.exists(selected):
+            self.product_table.selection_set(selected)
+        self._on_row_select()
+        self.status_var.set(
+            f"{len(products)} products  ·  {len(inventory.get_low_stock_products())} need restocking"
+        )
 
     def _open_create_modal(self) -> None:
-        modal = self._open_modal_shell("Create Product", 540, 640)
+        self._open_product_editor()
 
-        content = ttk.Frame(modal, padding=16)
-        content.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(content, text="Create Product", font=("Segoe UI", 15, "bold")).grid(row=0, column=0, columnspan=2, sticky="w")
-        ttk.Label(content, text="Enter the product information below.", font=("Segoe UI", 12)).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 12))
-
-        self._create_vars = {
-            "name": tk.StringVar(),
-            "description": tk.StringVar(),
-            "barcode": tk.StringVar(),
-            "original_price": tk.StringVar(),
-            "sell_price": tk.StringVar(),
-            "stock": tk.StringVar(),
-            "stock_tracked": tk.BooleanVar(value=False),
-            "parent_linked": tk.BooleanVar(value=False),
-            "parent_barcode": tk.StringVar(),
-            "parent_units": tk.StringVar(value="1"),
-        }
-
-        content.columnconfigure(1, weight=1)
-        self._field_row(content, "Name", self._create_vars["name"], 2)
-        self._field_row(content, "Description", self._create_vars["description"], 3)
-        self._field_row(content, "Barcode", self._create_vars["barcode"], 4)
-
-        # Original Price field + suggested hint
-        ttk.Label(content, text="Original Price").grid(row=5, column=0, sticky="w", pady=6, padx=(0, 10))
-        orig_entry = ttk.Entry(content, textvariable=self._create_vars["original_price"])
-        orig_entry.grid(row=5, column=1, sticky="ew", pady=6)
-        self._create_suggest_orig = ttk.Label(content, text="", font=("Segoe UI", 9, "italic"))
-        self._create_suggest_orig.grid(row=6, column=0, columnspan=2, sticky="w")
-
-        # Sell Price field + suggested hint
-        ttk.Label(content, text="Sell Price").grid(row=7, column=0, sticky="w", pady=6, padx=(0, 10))
-        sell_entry = ttk.Entry(content, textvariable=self._create_vars["sell_price"])
-        sell_entry.grid(row=7, column=1, sticky="ew", pady=6)
-        self._create_suggest_sell = ttk.Label(content, text="", font=("Segoe UI", 9, "italic"))
-        self._create_suggest_sell.grid(row=8, column=0, columnspan=2, sticky="w")
-
-        # Stock field moved down
-        self._field_row(content, "Stock", self._create_vars["stock"], 9)
-
-        tracking_row = ttk.Frame(content)
-        tracking_row.grid(row=10, column=0, columnspan=2, sticky="w", pady=(4, 8))
-        ttk.Checkbutton(
-            tracking_row,
-            text="Track stock for this product",
-            variable=self._create_vars["stock_tracked"],
-        ).pack(anchor="w")
-        ttk.Label(
-            tracking_row,
-            text="Unchecked means the item can be sold without stock counting.",
-            font=("Segoe UI", 10),
-        ).pack(anchor="w", pady=(2, 0))
-
-        parent_row = ttk.Frame(content)
-        parent_row.grid(row=11, column=0, columnspan=2, sticky="ew", pady=(4, 0))
-        ttk.Checkbutton(
-            parent_row,
-            text="Link stock to a parent item",
-            variable=self._create_vars["parent_linked"],
-        ).pack(anchor="w")
-
-        self._field_row(content, "Parent Barcode", self._create_vars["parent_barcode"], 12)
-        self._field_row(content, "Units per Parent", self._create_vars["parent_units"], 13)
-
-        button_row = ttk.Frame(content)
-        button_row.grid(row=14, column=0, columnspan=2, sticky="e", pady=(18, 0))
-
-        def submit() -> None:
-            try:
-                payload = self._product_payload()
-                payload.update(self._resolve_parent_link(None, payload["barcode"], self._create_vars))
-                product_id = inventory.create_product(payload)
-            except ValueError as exc:
-                messagebox.showerror("Validation error", str(exc), parent=modal)
-                return
-
-            modal.destroy()
-            self.refresh_products()
-            self.status_var.set(f"Product created: {product_id}")
-
-        tk.Button(button_row, text="Cancel", command=modal.destroy, bg="#64748b", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT, padx=(8, 0))
-        tk.Button(button_row, text="Add", command=submit, bg="#16a34a", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT)
-
-        # Suggestion logic: 20% markup (sell = orig * 1.2); vice versa orig = sell / 1.2
-        def _safe_float(val: str) -> float | None:
-            try:
-                return float(val)
-            except (ValueError, TypeError):
-                return None
-
-        def _update_create_suggestions(*_args) -> None:
-            orig = _safe_float(self._create_vars["original_price"].get())
-            sell = _safe_float(self._create_vars["sell_price"].get())
-
-            if orig is not None and (sell is None or sell == 0):
-                suggested = orig * 1.2
-                self._create_suggest_sell.config(text=f"Suggested sell price: {suggested:.2f} (20% markup)")
-            else:
-                self._create_suggest_sell.config(text="")
-
-            if sell is not None and (orig is None or orig == 0):
-                suggested_orig = sell / 1.2
-                self._create_suggest_orig.config(text=f"Suggested original price: {suggested_orig:.2f} (≈ sell/1.2)")
-            else:
-                self._create_suggest_orig.config(text="")
-
-        self._create_vars["original_price"].trace_add("write", _update_create_suggestions)
-        self._create_vars["sell_price"].trace_add("write", _update_create_suggestions)
-
-    def _open_update_modal(self, _event: tk.Event | None = None) -> None:
+    def _open_update_modal(self, _event=None) -> None:
         product = self._selected_product()
-        if product is None:
-            messagebox.showinfo("Update product", "Select a product first.", parent=self)
-            return
+        if product is not None:
+            self._open_product_editor(product)
 
-        modal = self._open_modal_shell("Update Product", 560, 680)
-        content = ttk.Frame(modal, padding=16)
-        content.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(content, text="Update Product", font=("Segoe UI", 15, "bold")).grid(row=0, column=0, columnspan=3, sticky="w")
-        ttk.Label(content, text=f"Selected: {product['name']} (ID {product['id']})", font=("Segoe UI", 12)).grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 12))
-
+    def _open_product_editor(self, product=None):
+        editing = product is not None
+        product = product or {}
+        modal = self._open_modal_shell(
+            "Edit product" if editing else "Add product", 600, 640
+        )
+        modal.columnconfigure(0, weight=1)
+        modal.rowconfigure(1, weight=1)
+        header = page_header(
+            modal,
+            "Edit product" if editing else "Add product",
+            "Enter product details and at least one price. Stock tracking is optional.",
+        )
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 8))
+        form = ScrollFrame(modal)
+        form.grid(row=1, column=0, sticky="nsew", padx=4)
+        body = form.content
+        body.columnconfigure(1, weight=1)
         vars_map = {
-            "name": tk.StringVar(value=product["name"]),
-            "description": tk.StringVar(value=product["description"]),
-            "barcode": tk.StringVar(value=product["barcode"]),
-            "original_price": tk.StringVar(value=f"{product['original_price']:.2f}"),
-            "sell_price": tk.StringVar(value=f"{product['sell_price']:.2f}"),
-            "stock": tk.StringVar(value=str(product["stock"])),
-            "stock_tracked": tk.BooleanVar(value=bool(product.get("stock_tracked", False))),
-            "parent_linked": tk.BooleanVar(value=bool(product.get("parent_product_id") is not None)),
+            "name": tk.StringVar(value=product.get("name", "")),
+            "description": tk.StringVar(value=product.get("description", "")),
+            "barcode": tk.StringVar(value=product.get("barcode", "")),
+            "original_price": tk.StringVar(
+                value=str(product.get("original_price", ""))
+            ),
+            "sell_price": tk.StringVar(value=str(product.get("sell_price", ""))),
+            "stock": tk.StringVar(value=str(product.get("stock", 0))),
+            "stock_tracked": tk.BooleanVar(
+                value=bool(product.get("stock_tracked", False))
+            ),
+            "parent_linked": tk.BooleanVar(
+                value=product.get("parent_product_id") is not None
+            ),
             "parent_barcode": tk.StringVar(),
             "parent_units": tk.StringVar(value=str(product.get("parent_units", 1))),
         }
-
+        if editing:
+            self._update_vars = vars_map
+        else:
+            self._create_vars = vars_map
         if product.get("parent_product_id") is not None:
-            parent_product = inventory.get_product_by_id(int(product["parent_product_id"]))
-            if parent_product is not None:
-                vars_map["parent_barcode"].set(parent_product["barcode"])
-
-        self._update_vars = vars_map
-
-        content.columnconfigure(1, weight=1)
-        self._field_row(content, "Name", vars_map["name"], 2)
-        self._field_row(content, "Description", vars_map["description"], 3)
-        self._field_row(content, "Barcode", vars_map["barcode"], 4)
-
-        # Original Price + suggestion
-        ttk.Label(content, text="Original Price").grid(row=5, column=0, sticky="w", pady=6, padx=(0, 10))
-        orig_entry = ttk.Entry(content, textvariable=vars_map["original_price"])
-        orig_entry.grid(row=5, column=1, sticky="ew", pady=6)
-        self._update_suggest_orig = ttk.Label(content, text="", font=("Segoe UI", 9, "italic"))
-        self._update_suggest_orig.grid(row=6, column=0, columnspan=2, sticky="w")
-
-        # Sell Price + suggestion
-        ttk.Label(content, text="Sell Price").grid(row=7, column=0, sticky="w", pady=6, padx=(0, 10))
-        sell_entry = ttk.Entry(content, textvariable=vars_map["sell_price"])
-        sell_entry.grid(row=7, column=1, sticky="ew", pady=6)
-        self._update_suggest_sell = ttk.Label(content, text="", font=("Segoe UI", 9, "italic"))
-        self._update_suggest_sell.grid(row=8, column=0, columnspan=2, sticky="w")
-
-        # Stock field moved down
-        self._field_row(content, "Stock", vars_map["stock"], 9)
-
-        tracking_row = ttk.Frame(content)
-        tracking_row.grid(row=10, column=0, columnspan=2, sticky="w", pady=(4, 8))
+            parent = inventory.get_product_by_id(int(product["parent_product_id"]))
+            if parent:
+                vars_map["parent_barcode"].set(parent["barcode"])
+        entries = {}
+        for row, (key, label) in enumerate(
+            [
+                ("name", "Product name *"),
+                ("barcode", "Barcode *"),
+                ("description", "Description"),
+                ("original_price", "Cost price"),
+                ("sell_price", "Selling price"),
+                ("stock", "Stock quantity"),
+            ]
+        ):
+            entries[key] = self._field_row(body, label, vars_map[key], row)
         ttk.Checkbutton(
-            tracking_row,
+            body,
             text="Track stock for this product",
             variable=vars_map["stock_tracked"],
-        ).pack(anchor="w")
+        ).grid(row=6, column=0, columnspan=2, sticky="w", pady=(8, 4))
         ttk.Label(
-            tracking_row,
-            text="If off, the product can still be scanned and sold.",
-            font=("Segoe UI", 10),
-        ).pack(anchor="w", pady=(2, 0))
+            body,
+            text="Untracked items can be sold without counting stock.",
+            style="Muted.TLabel",
+            wraplength=460,
+        ).grid(row=7, column=0, columnspan=2, sticky="w", pady=(0, 12))
+        advanced = ttk.LabelFrame(body, text="Parent stock", padding=12)
+        advanced.grid(row=9, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        advanced.columnconfigure(1, weight=1)
+        self._field_row(advanced, "Parent barcode", vars_map["parent_barcode"], 0)
+        self._field_row(advanced, "Units per parent", vars_map["parent_units"], 1)
 
-        parent_row = ttk.Frame(content)
-        parent_row.grid(row=11, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        def toggle_parent():
+            advanced.grid() if vars_map[
+                "parent_linked"
+            ].get() else advanced.grid_remove()
+
         ttk.Checkbutton(
-            parent_row,
+            body,
             text="Link stock to a parent item",
             variable=vars_map["parent_linked"],
-        ).pack(anchor="w")
+            command=toggle_parent,
+        ).grid(row=8, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        toggle_parent()
+        hint = tk.StringVar()
+        ttk.Label(body, textvariable=hint, style="Muted.TLabel", wraplength=460).grid(
+            row=10, column=0, columnspan=2, sticky="w"
+        )
 
-        self._field_row(content, "Parent Barcode", vars_map["parent_barcode"], 12)
-        self._field_row(content, "Units per Parent", vars_map["parent_units"], 13)
-
-        stock_buttons = ttk.Frame(content)
-        stock_buttons.grid(row=14, column=0, columnspan=2, sticky="w", pady=(6, 10))
-
-        def add_stock() -> None:
+        def suggest(*args):
             try:
-                current_stock = int(vars_map["stock"].get() or 0)
-                vars_map["stock"].set(str(current_stock + 1))
+                cost = float(vars_map["original_price"].get())
+                hint.set(
+                    f"20% markup suggestion: PHP {cost * 1.2:,.2f}"
+                    if not vars_map["sell_price"].get()
+                    else ""
+                )
             except ValueError:
-                messagebox.showerror("Stock error", "Stock must be a whole number.", parent=modal)
+                hint.set("")
 
-        def remove_stock() -> None:
+        vars_map["original_price"].trace_add("write", suggest)
+        vars_map["sell_price"].trace_add("write", suggest)
+        footer = ttk.Frame(modal, padding=(20, 12))
+        footer.grid(row=2, column=0, sticky="ew")
+        footer.columnconfigure(0, weight=1)
+        error = tk.StringVar()
+        ttk.Label(
+            footer, textvariable=error, foreground="#be123c", wraplength=540
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+
+        def submit():
             try:
-                current_stock = int(vars_map["stock"].get() or 0)
-            except ValueError:
-                messagebox.showerror("Stock error", "Stock must be a whole number.", parent=modal)
-                return
-
-            if current_stock > 0:
-                vars_map["stock"].set(str(current_stock - 1))
-
-        def clear_stock() -> None:
-            vars_map["stock"].set("0")
-
-        tk.Button(stock_buttons, text="Add Stock", command=add_stock, bg="#2563eb", fg="white", relief=tk.FLAT, padx=14, pady=8, font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT)
-        tk.Button(stock_buttons, text="Remove Stock", command=remove_stock, bg="#dc2626", fg="white", relief=tk.FLAT, padx=14, pady=8, font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT, padx=(8, 0))
-        tk.Button(stock_buttons, text="Clear Stock", command=clear_stock, bg="#475569", fg="white", relief=tk.FLAT, padx=14, pady=8, font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT, padx=(8, 0))
-
-        button_row = ttk.Frame(content)
-        button_row.grid(row=15, column=0, columnspan=2, sticky="e", pady=(18, 0))
-
-        def submit() -> None:
-            if not messagebox.askyesno(
-                "Confirm update",
-                f"Save changes to {product['name']}?",
-                parent=modal,
-            ):
-                return
-
-            try:
-                payload = {key: value.get() for key, value in vars_map.items()}
-                payload.update(self._resolve_parent_link(product["id"], payload["barcode"], vars_map))
-                inventory.update_product(product["id"], payload)
+                payload = {key: variable.get() for key, variable in vars_map.items()}
+                payload.update(
+                    self._resolve_parent_link(
+                        product.get("id"), payload["barcode"], vars_map
+                    )
+                )
+                if editing:
+                    inventory.update_product(product["id"], payload)
+                else:
+                    inventory.create_product(payload)
             except ValueError as exc:
-                messagebox.showerror("Validation error", str(exc), parent=modal)
+                error.set(str(exc))
                 return
-
             modal.destroy()
-            self.refresh_products(self.search_var.get())
-            self.status_var.set(f"Product updated: {product['name']}")
+            self.refresh_products()
+            self.status_var.set(
+                f"Product {'updated' if editing else 'added'}: {payload['name']}"
+            )
 
-        tk.Button(button_row, text="Cancel", command=modal.destroy, bg="#64748b", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT, padx=(8, 0))
-        tk.Button(button_row, text="Update", command=submit, bg="#f59e0b", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT)
-
-        # Suggestion logic for update modal
-        def _safe_float_update(val: str) -> float | None:
-            try:
-                return float(val)
-            except (ValueError, TypeError):
-                return None
-
-        def _update_update_suggestions(*_args) -> None:
-            orig = _safe_float_update(vars_map["original_price"].get())
-            sell = _safe_float_update(vars_map["sell_price"].get())
-
-            if orig is not None and (sell is None or sell == 0):
-                suggested = orig * 1.2
-                self._update_suggest_sell.config(text=f"Suggested sell price: {suggested:.2f} (20% markup)")
-            else:
-                self._update_suggest_sell.config(text="")
-
-            if sell is not None and (orig is None or orig == 0):
-                suggested_orig = sell / 1.2
-                self._update_suggest_orig.config(text=f"Suggested original price: {suggested_orig:.2f} (≈ sell/1.2)")
-            else:
-                self._update_suggest_orig.config(text="")
-
-        vars_map["original_price"].trace_add("write", _update_update_suggestions)
-        vars_map["sell_price"].trace_add("write", _update_update_suggestions)
+        ActionButton(footer, text="Cancel", command=modal.destroy).grid(
+            row=1, column=0, sticky="e", padx=(0, 8)
+        )
+        ActionButton(
+            footer,
+            text="Save changes" if editing else "Add product",
+            variant="Primary",
+            command=submit,
+        ).grid(row=1, column=1)
+        modal.bind("<Control-Return>", lambda e: submit())
+        entries["name"].focus_set()
 
     def _open_restock_modal(self) -> None:
-        modal = self._open_modal_shell("Restock Product", 640, 430)
-        content = ttk.Frame(modal, padding=16)
-        content.pack(fill=tk.BOTH, expand=True)
-        content.columnconfigure(1, weight=1)
-
-        ttk.Label(content, text="Restock Product", font=("Segoe UI", 15, "bold")).grid(row=0, column=0, columnspan=2, sticky="w")
-        ttk.Label(
+        modal = self._open_modal_shell("Restock products", 760, 640)
+        modal.minsize(
+            min(600, modal.winfo_screenwidth() - 32),
+            min(520, modal.winfo_screenheight() - 80),
+        )
+        content = ttk.Frame(modal, padding=20)
+        content.pack(fill="both", expand=True)
+        content.columnconfigure(0, weight=1)
+        content.rowconfigure(2, weight=1)
+        page_header(
             content,
-            text="Scan a barcode, review the product, enter the restock quantity, then confirm.",
-            font=("Segoe UI", 12),
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 12))
-
-        barcode_var = tk.StringVar()
+            "Restock products",
+            "Search by product name or scan a barcode, then select an item to restock.",
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        query_var = tk.StringVar()
         qty_var = tk.StringVar(value="1")
-        product_summary_var = tk.StringVar(value="Scan a barcode to load a product.")
-        loaded_product: dict | None = None
+        summary_var = tk.StringVar(value="Select a product from the results.")
+        status_var = tk.StringVar()
+        state = {"product_id": None, "pending": None, "displayed_query": ""}
 
-        ttk.Label(content, text="Barcode").grid(row=2, column=0, sticky="w", pady=6, padx=(0, 10))
-        barcode_entry = ttk.Entry(content, textvariable=barcode_var, font=("Consolas", 12))
-        barcode_entry.grid(row=2, column=1, sticky="ew", pady=6)
+        search = ttk.Frame(content)
+        search.grid(row=1, column=0, sticky="ew", pady=(0, 12))
+        search.columnconfigure(0, weight=1)
+        ttk.Label(search, text="Product name or barcode", style="Muted.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 4)
+        )
+        query_entry = ttk.Entry(search, textvariable=query_var)
+        query_entry.grid(row=1, column=0, sticky="ew")
+        box, results = table(
+            content,
+            ("name", "barcode", "stock", "tracked"),
+            ("Product", "Barcode", "Stock", "Tracking"),
+            (280, 170, 80, 100),
+            height=4,
+            empty_text="Enter a product name or barcode to find matching items.",
+        )
+        box.grid(row=2, column=0, sticky="nsew")
+        summary = ttk.Label(
+            content, textvariable=summary_var, wraplength=700, justify="left"
+        )
+        summary.grid(row=3, column=0, sticky="ew", pady=(12, 8))
+        content.bind(
+            "<Configure>",
+            lambda e: summary.configure(wraplength=max(200, e.width - 40)),
+            add="+",
+        )
+        quantity = ttk.Frame(content)
+        quantity.grid(row=4, column=0, sticky="ew")
+        ttk.Label(quantity, text="Quantity to add").pack(side="left", padx=(0, 12))
+        qty_entry = ttk.Entry(quantity, textvariable=qty_var, width=10)
+        qty_entry.pack(side="left")
+        status = ttk.Label(
+            content, textvariable=status_var, style="Muted.TLabel", wraplength=700
+        )
+        status.grid(row=5, column=0, sticky="ew", pady=(8, 0))
+        content.bind(
+            "<Configure>",
+            lambda e: status.configure(wraplength=max(200, e.width - 40)),
+            add="+",
+        )
+        actions = ttk.Frame(content)
+        actions.grid(row=6, column=0, sticky="e", pady=(12, 0))
 
-        ttk.Label(content, text="Item").grid(row=3, column=0, sticky="nw", pady=(10, 0), padx=(0, 10))
-        summary_box = ttk.LabelFrame(content, text="Scanned Item", padding=10)
-        summary_box.grid(row=3, column=1, sticky="ew", pady=(10, 0))
-        summary_box.columnconfigure(0, weight=1)
-        ttk.Label(summary_box, textvariable=product_summary_var, wraplength=430, justify=tk.LEFT).grid(row=0, column=0, sticky="w")
+        def clear_selection():
+            state["product_id"] = None
+            selected = results.selection()
+            if selected:
+                results.selection_remove(selected)
+            restock_button.configure(state="disabled")
+            summary_var.set("Select a product from the results.")
 
-        ttk.Label(content, text="Quantity").grid(row=4, column=0, sticky="w", pady=6, padx=(0, 10))
-        qty_entry = ttk.Entry(content, textvariable=qty_var, width=10)
-        qty_entry.grid(row=4, column=1, sticky="w", pady=6)
-
-        status_var = tk.StringVar(value="")
-        ttk.Label(content, textvariable=status_var, foreground="#64748b").grid(row=5, column=0, columnspan=2, sticky="w", pady=(8, 0))
-
-        button_row = ttk.Frame(content)
-        button_row.grid(row=6, column=0, columnspan=2, sticky="e", pady=(18, 0))
-
-        def _parse_qty() -> int | None:
-            raw_value = qty_var.get().strip()
-            if not raw_value:
-                messagebox.showerror("Invalid input", "Enter a quantity to restock.", parent=modal)
-                return None
-            if not raw_value.isdigit():
-                messagebox.showerror("Invalid input", "Quantity must be a whole number.", parent=modal)
-                return None
-
-            quantity = int(raw_value)
-            if quantity <= 0:
-                messagebox.showerror("Invalid input", "Quantity must be at least 1.", parent=modal)
-                return None
-            return quantity
-
-        def load_product() -> None:
-            nonlocal loaded_product
-            barcode = barcode_var.get().strip()
-            if not barcode:
-                loaded_product = None
-                product_summary_var.set("Enter or scan a barcode first.")
-                status_var.set("")
+        def select_product(event=None):
+            selected = results.selection()
+            if not selected or state["displayed_query"] != query_var.get().strip():
+                state["product_id"] = None
+                restock_button.configure(state="disabled")
                 return
-
-            product = inventory.get_product_by_barcode(barcode)
+            product = inventory.get_product_by_id(int(selected[0]))
             if product is None:
-                loaded_product = None
-                product_summary_var.set(f"No product found for barcode: {barcode}")
-                status_var.set("")
+                clear_selection()
+                status_var.set("This product is no longer available. Search again.")
                 return
-
-            loaded_product = product
-            product_summary_var.set(
-                f"{product['name']}\n"
-                f"Barcode: {product['barcode']}\n"
-                f"Current stock: {product['stock']}\n"
-                f"Tracked: {'Yes' if product.get('stock_tracked', False) else 'No'}"
+            state["product_id"] = product["id"]
+            summary_var.set(
+                f"{product['name']}\nBarcode: {product['barcode']}  ·  Stock: {product['stock']}  ·  Tracking: {'On' if product.get('stock_tracked') else 'Off'}"
             )
-            status_var.set(f"Loaded: {product['name']}")
-            qty_entry.focus_set()
-            qty_entry.selection_range(0, tk.END)
+            restock_button.configure(state="normal")
 
-        def restock_product() -> None:
-            nonlocal loaded_product
-            if loaded_product is None:
-                messagebox.showerror("Invalid input", "Scan a barcode first.", parent=modal)
-                return
+        def focus_quantity(event=None):
+            select_product()
+            if state["product_id"] is not None:
+                qty_entry.focus_set()
+                qty_entry.selection_range(0, "end")
+            return "break"
 
-            quantity = _parse_qty()
-            if quantity is None:
-                return
+        def cancel_pending():
+            if state["pending"] is not None:
+                modal.after_cancel(state["pending"])
+                state["pending"] = None
 
+        def search_products(autoselect_barcode=False):
+            cancel_pending()
+            clear_selection()
+            query = query_var.get().strip()
+            state["displayed_query"] = query
+            results.delete(*results.get_children())
+            products = inventory.search_products(query) if query else []
+            for product in products:
+                results.insert(
+                    "",
+                    "end",
+                    iid=str(product["id"]),
+                    values=(
+                        product["name"],
+                        product["barcode"],
+                        product["stock"],
+                        "Tracked" if product.get("stock_tracked") else "Untracked",
+                    ),
+                )
+            results.empty_text = (
+                "No matching products found. Try another name or barcode."
+                if query
+                else "Enter a product name or barcode to find matching items."
+            )
+            results._refresh_empty()
+            status_var.set(
+                f"{len(products)} matching products. Select an item to restock."
+                if query
+                else "Enter a product name or barcode."
+            )
+            if autoselect_barcode:
+                exact = next(
+                    (product for product in products if product["barcode"] == query),
+                    None,
+                )
+                if exact is not None:
+                    results.selection_set(str(exact["id"]))
+                    results.see(str(exact["id"]))
+                    focus_quantity()
+
+        def query_changed(*args):
+            cancel_pending()
+            clear_selection()
+            status_var.set("Searching…")
+
+            def delayed_search():
+                state["pending"] = None
+                search_products()
+
+            state["pending"] = modal.after(200, delayed_search)
+
+        def restock_product(event=None):
+            if state["product_id"] is None:
+                status_var.set("Select a product from the results first.")
+                return "break"
+            raw = qty_var.get().strip()
+            if not raw.isdecimal() or int(raw) <= 0:
+                status_var.set("Enter a whole-number quantity greater than zero.")
+                qty_entry.focus_set()
+                return "break"
+            product = inventory.get_product_by_id(state["product_id"])
+            if product is None:
+                clear_selection()
+                status_var.set("This product is no longer available. Search again.")
+                return "break"
+            amount = int(raw)
             if not messagebox.askyesno(
                 "Confirm restock",
-                f"Add {quantity} to stock for {loaded_product['name']}?",
+                f"Add {amount} to stock for {product['name']}?\nBarcode: {product['barcode']}",
                 parent=modal,
             ):
-                return
-
+                return "break"
             try:
-                new_stock = inventory.adjust_stock(loaded_product["id"], quantity)
+                new_stock = inventory.adjust_stock(product["id"], amount)
             except ValueError as exc:
-                messagebox.showerror("Restock error", str(exc), parent=modal)
-                return
-
+                status_var.set(str(exc))
+                return "break"
             self.refresh_products(self.search_var.get())
-            self.status_var.set(f"Restocked {loaded_product['name']} by {quantity}. New stock: {new_stock}")
-            loaded_product = None
-            barcode_var.set("")
+            message = f"Restocked {product['name']} by {amount}. New stock: {new_stock}"
+            self.status_var.set(message)
+            if query_var.get().strip() == product["barcode"]:
+                query_var.set("")
             qty_var.set("1")
-            product_summary_var.set("Scan a barcode to load a product.")
-            barcode_entry.focus_set()
+            search_products()
+            status_var.set(message)
+            query_entry.focus_set()
+            query_entry.selection_range(0, "end")
+            return "break"
 
-        barcode_entry.bind("<Return>", lambda _event: load_product())
-        qty_entry.bind("<Return>", lambda _event: restock_product())
+        def on_search_enter(event=None):
+            search_products(autoselect_barcode=True)
+            return "break"
 
-        tk.Button(
-            button_row,
-            text="Load Item",
-            command=load_product,
-            bg="#1d4ed8",
-            fg="white",
-            relief=tk.FLAT,
-            padx=14,
-            pady=8,
-            font=("Segoe UI", 11, "bold"),
-        ).pack(side=tk.LEFT)
-        tk.Button(
-            button_row,
+        ActionButton(search, text="Search", command=on_search_enter).grid(
+            row=1, column=1, padx=(8, 0)
+        )
+        ActionButton(actions, text="Close", command=modal.destroy).pack(
+            side="right", padx=(8, 0)
+        )
+        restock_button = ActionButton(
+            actions,
             text="Restock",
+            variant="Primary",
             command=restock_product,
-            bg="#0ea5e9",
-            fg="white",
-            relief=tk.FLAT,
-            padx=14,
-            pady=8,
-            font=("Segoe UI", 11, "bold"),
-        ).pack(side=tk.LEFT, padx=(8, 0))
-        tk.Button(
-            button_row,
-            text="Cancel",
-            command=modal.destroy,
-            bg="#64748b",
-            fg="white",
-            relief=tk.FLAT,
-            padx=14,
-            pady=8,
-            font=("Segoe UI", 11, "bold"),
-        ).pack(side=tk.RIGHT)
-
-        barcode_entry.focus_set()
+            state="disabled",
+        )
+        restock_button.pack(side="right")
+        results.bind("<<TreeviewSelect>>", select_product)
+        results.bind("<Double-1>", focus_quantity)
+        results.bind("<Return>", focus_quantity)
+        query_entry.bind("<Return>", on_search_enter)
+        qty_entry.bind("<Return>", restock_product)
+        query_var.trace_add("write", query_changed)
+        modal.bind(
+            "<Destroy>",
+            lambda e: cancel_pending() if e.widget is modal else None,
+            add="+",
+        )
+        query_entry.focus_set()
 
     def _open_delete_modal(self) -> None:
         product = self._selected_product()
         if product is None:
-            messagebox.showinfo("Delete product", "Select a product first.", parent=self)
+            self.status_var.set("Select a product to delete.")
             return
+        modal = self._open_modal_shell("Delete product", 520, 360)
+        content = ttk.Frame(modal, padding=24)
+        content.pack(fill="both", expand=True)
+        content.columnconfigure(0, weight=1)
+        content.rowconfigure(1, weight=1)
+        ttk.Label(content, text="Delete this product?", style="Section.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 16)
+        )
+        ttk.Label(
+            content,
+            text=f"{product['name']}\n\nBarcode: {product['barcode']}\n\nThis permanently removes the product from Inventory.",
+            wraplength=460,
+            justify="left",
+        ).grid(row=1, column=0, sticky="nw")
+        error = tk.StringVar()
+        ttk.Label(
+            content, textvariable=error, foreground="#be123c", wraplength=460
+        ).grid(row=2, column=0, sticky="w", pady=8)
+        actions = ttk.Frame(content)
+        actions.grid(row=3, column=0, sticky="e")
 
-        modal = self._open_modal_shell("Delete Product", 500, 320)
-        content = ttk.Frame(modal, padding=16)
-        content.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(content, text="Confirm Delete", font=("Segoe UI", 15, "bold")).pack(anchor="w")
-        ttk.Label(content, text="Review the selected product before confirming deletion.", font=("Segoe UI", 12)).pack(anchor="w", pady=(4, 12))
-
-        details = ttk.LabelFrame(content, text="Product Details")
-        details.pack(fill=tk.BOTH, expand=True)
-
-        info_lines = [
-            f"Name: {product['name']}",
-            f"Description: {product['description']}",
-            f"Barcode: {product['barcode']}",
-            f"Sell Price: {product['sell_price']:.2f}",
-            f"Stock: {product['stock']}",
-        ]
-
-        for line in info_lines:
-            ttk.Label(details, text=line, font=("Segoe UI", 12)).pack(anchor="w", padx=10, pady=2)
-
-        button_row = ttk.Frame(content)
-        button_row.pack(anchor="e", pady=(16, 0))
-
-        def confirm_delete() -> None:
-            if not messagebox.askyesno(
-                "Confirm delete",
-                f"Delete {product['name']} permanently?",
-                parent=modal,
-            ):
-                return
-
+        def remove():
             try:
                 inventory.delete_product(product["id"])
             except ValueError as exc:
-                messagebox.showerror("Cannot delete product", str(exc), parent=modal)
+                error.set(str(exc))
                 return
-
             modal.destroy()
             self.selected_product_id = None
-            self.refresh_products(self.search_var.get())
+            self.refresh_products()
             self.status_var.set(f"Product deleted: {product['name']}")
 
-        tk.Button(button_row, text="Cancel", command=modal.destroy, bg="#64748b", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT, padx=(8, 0))
-        tk.Button(button_row, text="Confirm", command=confirm_delete, bg="#dc2626", fg="white", relief=tk.FLAT, padx=18, pady=8, font=("Segoe UI", 12, "bold")).pack(side=tk.RIGHT)
+        ActionButton(actions, text="Cancel", command=modal.destroy).pack(
+            side="left", padx=(0, 8)
+        )
+        ActionButton(
+            actions, text="Delete product", variant="Danger", command=remove
+        ).pack(side="left")
 
     def _open_settings_modal(self) -> None:
-        modal = self._open_modal_shell("Inventory Settings", 980, 650)
-        content = ttk.Frame(modal, padding=16)
-        content.pack(fill=tk.BOTH, expand=True)
-        content.columnconfigure(0, weight=1)
-        content.rowconfigure(2, weight=1)
-
-        ttk.Label(content, text="Inventory Settings", font=("Segoe UI", 15, "bold")).grid(row=0, column=0, sticky="w")
-        ttk.Label(
-            content,
-            text="Configure low stock monitoring and choose which products appear in POS quick access.",
-            font=("Segoe UI", 12),
-        ).grid(row=1, column=0, sticky="w", pady=(4, 12))
-
-        threshold_frame = ttk.LabelFrame(content, text="Low Stock Threshold", padding=12)
-        threshold_frame.grid(row=2, column=0, sticky="ew", pady=(0, 12))
-        threshold_frame.columnconfigure(1, weight=1)
-
+        modal = self._open_modal_shell("Inventory settings", 760, 600)
+        modal.columnconfigure(0, weight=1)
+        modal.rowconfigure(3, weight=1)
+        page_header(
+            modal,
+            "Inventory settings",
+            "Set stock alerts and choose items for POS quick access.",
+        ).grid(row=0, column=0, sticky="ew", padx=20, pady=16)
+        options = ttk.Frame(modal)
+        options.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 12))
         threshold_var = tk.StringVar(value=str(inventory.get_low_stock_threshold()))
-        ttk.Label(threshold_frame, text="Threshold:").grid(row=0, column=0, sticky="w", padx=(0, 10))
-        threshold_entry = ttk.Entry(threshold_frame, textvariable=threshold_var, width=12)
-        threshold_entry.grid(row=0, column=1, sticky="w")
-        ttk.Label(
-            threshold_frame,
-            text="Products with stock at or below this number will be flagged as low stock.",
-            font=("Segoe UI", 10),
-            foreground="#64748b",
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
-
-        quick_area = ttk.Frame(content)
-        quick_area.grid(row=3, column=0, sticky="nsew")
-        quick_area.columnconfigure(0, weight=3)
-        quick_area.columnconfigure(1, weight=2)
-        quick_area.rowconfigure(1, weight=1)
-
-        search_frame = ttk.Frame(quick_area)
-        search_frame.grid(row=0, column=0, sticky="ew", padx=(0, 8), pady=(0, 8))
-        search_frame.columnconfigure(1, weight=1)
-        ttk.Label(search_frame, text="Search items:", font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(options, text="Low-stock threshold").pack(side="left", padx=(0, 12))
+        ttk.Entry(options, textvariable=threshold_var, width=8).pack(side="left")
         search_var = tk.StringVar()
-        search_entry = ttk.Entry(search_frame, textvariable=search_var, font=("Segoe UI", 12))
-        search_entry.grid(row=0, column=1, sticky="ew", padx=(10, 8))
-
-        quick_status_var = tk.StringVar(value="Select an item and press Quicklist to add it to the quick access list.")
-        ttk.Label(search_frame, textvariable=quick_status_var, foreground="#64748b").grid(
-            row=1, column=0, columnspan=3, sticky="w", pady=(6, 0)
+        search = ttk.Entry(modal, textvariable=search_var)
+        search.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 12))
+        box, products = table(
+            modal,
+            ("name", "price", "stock", "quick"),
+            ("Product", "Sell price", "Stock", "Quick access"),
+            (260, 100, 70, 120),
+            empty_text="No matching products.",
         )
+        box.grid(row=3, column=0, sticky="nsew", padx=20)
+        quick_ids = list(inventory.get_quick_access_product_ids())
 
-        item_panel = ttk.Frame(quick_area)
-        item_panel.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
-        item_panel.columnconfigure(0, weight=1)
-        item_panel.rowconfigure(0, weight=1)
-
-        item_columns = ("name", "price", "stock")
-        item_tree = ttk.Treeview(item_panel, columns=item_columns, show="headings", height=14)
-        item_tree.heading("name", text="Name")
-        item_tree.heading("price", text="Price")
-        item_tree.heading("stock", text="Stock")
-        item_tree.column("name", width=320, anchor=tk.W)
-        item_tree.column("price", width=100, anchor=tk.E)
-        item_tree.column("stock", width=80, anchor=tk.CENTER)
-        item_tree.grid(row=0, column=0, sticky="nsew")
-
-        item_scroll = ttk.Scrollbar(item_panel, orient=tk.VERTICAL, command=item_tree.yview)
-        item_scroll.grid(row=0, column=1, sticky="ns")
-        item_tree.configure(yscrollcommand=item_scroll.set)
-
-        quick_panel = ttk.Frame(quick_area)
-        quick_panel.grid(row=0, column=1, rowspan=2, sticky="nsew")
-        quick_panel.columnconfigure(0, weight=1)
-        quick_panel.rowconfigure(1, weight=1)
-
-        ttk.Label(quick_panel, text="Quick Access List", font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
-
-        quick_list_frame = ttk.Frame(quick_panel)
-        quick_list_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
-        quick_list_frame.columnconfigure(0, weight=1)
-        quick_list_frame.rowconfigure(0, weight=1)
-
-        quick_columns = ("name", "price", "stock")
-        quick_tree = ttk.Treeview(quick_list_frame, columns=quick_columns, show="headings", height=14)
-        quick_tree.heading("name", text="Name")
-        quick_tree.heading("price", text="Price")
-        quick_tree.heading("stock", text="Stock")
-        quick_tree.column("name", width=220, anchor=tk.W)
-        quick_tree.column("price", width=90, anchor=tk.E)
-        quick_tree.column("stock", width=70, anchor=tk.CENTER)
-        quick_tree.grid(row=0, column=0, sticky="nsew")
-
-        quick_scroll = ttk.Scrollbar(quick_list_frame, orient=tk.VERTICAL, command=quick_tree.yview)
-        quick_scroll.grid(row=0, column=1, sticky="ns")
-        quick_tree.configure(yscrollcommand=quick_scroll.set)
-
-        quick_button_row = ttk.Frame(quick_panel)
-        quick_button_row.grid(row=2, column=0, sticky="ew", pady=(8, 0))
-
-        current_quick_ids = []
-        for product_id in inventory.get_quick_access_product_ids():
-            if inventory.get_product_by_id(product_id) is not None and product_id not in current_quick_ids:
-                current_quick_ids.append(product_id)
-
-        product_lookup: dict[int, dict] = {}
-
-        def refresh_items(search_term: str = "") -> None:
-            for row_id in item_tree.get_children():
-                item_tree.delete(row_id)
-
-            product_lookup.clear()
-            products = inventory.search_products(search_term) if search_term else inventory.list_products()
-            for product in products:
-                product_lookup[product["id"]] = product
-                item_tree.insert(
+        def load(*args):
+            products.delete(*products.get_children())
+            for product in inventory.list_products(search_var.get().strip()):
+                products.insert(
                     "",
-                    tk.END,
+                    "end",
                     iid=str(product["id"]),
                     values=(
                         product["name"],
-                        f"{product['sell_price']:.2f}",
-                        product["stock"],
+                        f"{product['sell_price']:,.2f}",
+                        product["stock"] if product.get("stock_tracked") else "—",
+                        "Included" if product["id"] in quick_ids else "—",
                     ),
                 )
 
-        def refresh_quick_list() -> None:
-            for row_id in quick_tree.get_children():
-                quick_tree.delete(row_id)
-
-            sanitized_ids: list[int] = []
-            for product_id in current_quick_ids:
-                product = inventory.get_product_by_id(product_id)
-                if product is None or product_id in sanitized_ids:
-                    continue
-                sanitized_ids.append(product_id)
-                quick_tree.insert(
-                    "",
-                    tk.END,
-                    iid=str(product_id),
-                    values=(
-                        product["name"],
-                        f"{product['sell_price']:.2f}",
-                        product["stock"],
-                    ),
-                )
-
-            current_quick_ids[:] = sanitized_ids
-
-        def add_selected_to_quicklist() -> None:
-            selected = item_tree.selection()
+        def toggle(event=None):
+            selected = products.selection()
             if not selected:
-                messagebox.showerror("Invalid input", "Select an item first", parent=modal)
                 return
-
             product_id = int(selected[0])
-            if product_id in current_quick_ids:
-                quick_status_var.set("That item is already in the quick access list.")
-                return
-
-            product = product_lookup.get(product_id)
-            if product is None:
-                messagebox.showerror("Invalid input", "Selected item not found", parent=modal)
-                return
-
-            current_quick_ids.append(product_id)
-            refresh_quick_list()
-            quick_status_var.set(f"Added to quick access: {product['name']}")
-
-        def remove_selected_from_quicklist() -> None:
-            selected = quick_tree.selection()
-            if not selected:
-                messagebox.showerror("Invalid input", "Select a quick access item first", parent=modal)
-                return
-
-            product_id = int(selected[0])
-            if product_id in current_quick_ids:
-                current_quick_ids.remove(product_id)
-                refresh_quick_list()
-                quick_status_var.set("Removed from quick access list.")
-
-        def submit() -> None:
-            try:
-                threshold_value = int(threshold_var.get() or 10)
-                if threshold_value < 0:
-                    raise ValueError
-            except ValueError:
-                messagebox.showerror(
-                    "Validation error",
-                    "Low stock threshold must be a whole number of 0 or more.",
-                    parent=modal,
-                )
-                return
-
-            inventory.set_low_stock_threshold(threshold_value)
-            inventory.set_quick_access_product_ids(current_quick_ids)
-            modal.destroy()
-            self.refresh_products()
-            self.status_var.set(
-                f"Settings saved: Low stock threshold set to {threshold_value} and {len(current_quick_ids)} quick items saved"
+            quick_ids.remove(
+                product_id
+            ) if product_id in quick_ids else quick_ids.append(product_id)
+            products.set(
+                selected[0], "quick", "Included" if product_id in quick_ids else "—"
             )
 
-        search_var.trace_add("write", lambda *_args: refresh_items(search_var.get().strip()))
-        search_entry.bind("<Return>", lambda _event: refresh_items(search_var.get().strip()))
-        item_tree.bind("<Double-1>", lambda _event: add_selected_to_quicklist())
-        quick_tree.bind("<Delete>", lambda _event: remove_selected_from_quicklist())
-
-        quicklist_button = tk.Button(
-            quick_button_row,
-            text="Quicklist",
-            command=add_selected_to_quicklist,
-            bg="#4f46e5",
-            fg="white",
-            relief=tk.FLAT,
-            padx=14,
-            pady=6,
-            font=("Segoe UI", 11, "bold"),
-            cursor="hand2",
+        products.bind("<Double-1>", toggle)
+        products.bind("<space>", toggle)
+        search_var.trace_add("write", load)
+        feedback = tk.StringVar(
+            value="Double-click a product or press Space to toggle quick access."
         )
-        quicklist_button.pack(side=tk.LEFT)
+        footer = ttk.Frame(modal, padding=20)
+        footer.grid(row=4, column=0, sticky="ew")
+        footer.columnconfigure(0, weight=1)
+        ttk.Label(
+            footer, textvariable=feedback, style="Muted.TLabel", wraplength=680
+        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 12))
 
-        tk.Button(
-            quick_button_row,
-            text="Remove",
-            command=remove_selected_from_quicklist,
-            bg="#64748b",
-            fg="white",
-            relief=tk.FLAT,
-            padx=14,
-            pady=6,
-            font=("Segoe UI", 11, "bold"),
-            cursor="hand2",
-        ).pack(side=tk.LEFT, padx=(8, 0))
+        def save():
+            try:
+                value = int(threshold_var.get())
+                if value < 0:
+                    raise ValueError
+            except ValueError:
+                feedback.set("Enter a whole-number threshold of zero or more.")
+                return
+            inventory.set_low_stock_threshold(value)
+            inventory.set_quick_access_product_ids(quick_ids)
+            self.refresh_products()
+            self.status_var.set("Inventory settings saved.")
+            modal.destroy()
 
-        button_row = ttk.Frame(content)
-        button_row.grid(row=4, column=0, sticky="e", pady=(18, 0))
-
-        tk.Button(
-            button_row,
-            text="Cancel",
-            command=modal.destroy,
-            bg="#64748b",
-            fg="white",
-            relief=tk.FLAT,
-            padx=18,
-            pady=8,
-            font=("Segoe UI", 12, "bold"),
-        ).pack(side=tk.RIGHT, padx=(8, 0))
-        tk.Button(
-            button_row,
-            text="Save",
-            command=submit,
-            bg="#a855f7",
-            fg="white",
-            relief=tk.FLAT,
-            padx=18,
-            pady=8,
-            font=("Segoe UI", 12, "bold"),
-        ).pack(side=tk.RIGHT)
-
-        refresh_items()
-        refresh_quick_list()
-        search_entry.focus_set()
+        ActionButton(footer, text="Toggle quick access", command=toggle).grid(
+            row=1, column=0, sticky="w"
+        )
+        ActionButton(footer, text="Cancel", command=modal.destroy).grid(
+            row=1, column=1, padx=(8, 8)
+        )
+        ActionButton(
+            footer, text="Save settings", variant="Primary", command=save
+        ).grid(row=1, column=2)
+        load()
+        search.focus_set()

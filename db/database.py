@@ -1,16 +1,11 @@
 import json
 import math
 import sqlite3
-import sys
-from pathlib import Path
 
+from core.app_paths import database_path, legacy_database_path, prepare_database
+from core.passwords import migrate_passwords
 
-if getattr(sys, "frozen", False):
-    BASE_DIR = Path(sys.executable).resolve().parent
-else:
-    BASE_DIR = Path(__file__).resolve().parent.parent
-
-DB_FILE = BASE_DIR / "pos.db"
+DB_FILE = database_path()
 LOW_STOCK_THRESHOLD = 10
 
 
@@ -50,6 +45,7 @@ def _parent_product_column_exists(conn: sqlite3.Connection) -> bool:
 
 
 def init_database() -> None:
+    prepare_database(DB_FILE, legacy_database_path())
     with get_connection() as conn:
         conn.execute(
             """
@@ -155,11 +151,8 @@ def init_database() -> None:
             """
         )
 
-        # ensure default admin user exists (hardcoded credentials)
-        conn.execute(
-            "INSERT OR IGNORE INTO users (username, password, is_admin) VALUES (?, ?, ?)",
-            ("admin", "KennyDLuffy213", 1),
-        )
+        _ensure_column(conn, "users", "must_change_password", "INTEGER NOT NULL DEFAULT 0")
+        migrate_passwords(conn)
 
         conn.execute(
             """
@@ -211,6 +204,64 @@ def init_database() -> None:
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
             ("quick_access_product_ids", "[]"),
+        )
+
+        # Cash services share a ledger independent of product sales.
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS cash_out_accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                account_number TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS cash_out_fee_rules (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                block_amount_cents INTEGER NOT NULL CHECK (block_amount_cents > 0),
+                split_amount_cents INTEGER NOT NULL CHECK (split_amount_cents > 0),
+                block_fee_cents INTEGER NOT NULL CHECK (block_fee_cents >= 0),
+                lower_fee_cents INTEGER NOT NULL CHECK (lower_fee_cents >= 0),
+                upper_fee_cents INTEGER NOT NULL CHECK (upper_fee_cents >= 0),
+                CHECK (split_amount_cents < block_amount_cents)
+            );
+            INSERT OR IGNORE INTO cash_out_fee_rules VALUES
+                (1, 100000, 50000, 1500, 500, 1000);
+            CREATE TABLE IF NOT EXISTS cash_out_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                transferred_at TEXT NOT NULL,
+                receiving_account_id INTEGER NOT NULL
+                    REFERENCES cash_out_accounts(id),
+                receiving_account_name TEXT NOT NULL,
+                receiving_account_number TEXT NOT NULL,
+                sender_account TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+                fee_cents INTEGER NOT NULL CHECK (fee_cents >= 0),
+                suggested_fee_cents INTEGER NOT NULL CHECK (suggested_fee_cents >= 0),
+                reference_last5 TEXT NOT NULL CHECK (
+                    length(reference_last5) = 5 AND
+                    reference_last5 NOT GLOB '*[^0-9]*'
+                ),
+                status TEXT NOT NULL DEFAULT 'unclaimed'
+                    CHECK (status IN ('unclaimed', 'claimed')),
+                created_at TEXT NOT NULL,
+                claimed_at TEXT,
+                CHECK ((status = 'unclaimed' AND claimed_at IS NULL) OR
+                       (status = 'claimed' AND claimed_at IS NOT NULL))
+            );
+            CREATE INDEX IF NOT EXISTS cash_out_duplicate_lookup
+                ON cash_out_transactions
+                (receiving_account_id, reference_last5, amount_cents, transferred_at);
+            CREATE INDEX IF NOT EXISTS cash_out_transfer_time_lookup
+                ON cash_out_transactions (transferred_at);
+            """
+        )
+        _ensure_column(
+            conn, "cash_out_transactions", "transaction_type",
+            "TEXT NOT NULL DEFAULT 'cash_out' CHECK (transaction_type IN ('cash_out', 'cash_in'))",
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS cash_service_duplicate_lookup "
+            "ON cash_out_transactions (transaction_type, receiving_account_id, "
+            "reference_last5, amount_cents, transferred_at)"
         )
 
         conn.commit()

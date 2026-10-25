@@ -1,82 +1,11 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
 
 from core import auth
-
-
-class LoginModal:
-    def __init__(self, parent: tk.Tk) -> None:
-        self.parent = parent
-        self.user = None
-
-    def show(self) -> dict | None:
-        modal = tk.Toplevel(self.parent)
-        modal.title("Login")
-        modal.geometry("480x260")
-        modal.resizable(False, False)
-        modal.transient(self.parent)
-        modal.grab_set()
-        modal.lift()
-
-        content = ttk.Frame(modal, padding=16)
-        content.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(content, text="Sign in", font=("Segoe UI", 14, "bold")).pack(anchor="w")
-        ttk.Label(content, text="Enter credentials to continue.").pack(anchor="w", pady=(4, 10))
-
-        username_var = tk.StringVar()
-        password_var = tk.StringVar()
-
-        ttk.Label(content, text="Username:").pack(anchor="w")
-        username_entry = ttk.Entry(content, textvariable=username_var)
-        username_entry.pack(fill=tk.X, pady=4)
-
-        ttk.Label(content, text="Password:").pack(anchor="w")
-        password_entry = ttk.Entry(content, textvariable=password_var, show="*")
-        password_entry.pack(fill=tk.X, pady=4)
-
-        def submit(event: tk.Event | None = None) -> None:
-            username = username_var.get().strip()
-            password = password_var.get().strip()
-            user = auth.verify_user(username, password)
-            if user is None:
-                messagebox.showerror("Login failed", "Invalid username or password", parent=modal)
-                return
-            self.user = user
-            modal.destroy()
-
-        btn_row = ttk.Frame(content)
-        btn_row.pack(fill=tk.X, pady=(12, 0))
-
-        cancel_btn = tk.Button(
-            btn_row,
-            text="Cancel",
-            command=modal.destroy,
-            bg="#9ca3af",
-            fg="#000",
-            activebackground="#a3a3a3",
-            font=("Segoe UI", 10),
-        )
-        cancel_btn.pack(side=tk.RIGHT, padx=(8, 0))
-
-        sign_btn = tk.Button(
-            btn_row,
-            text="Sign In",
-            command=submit,
-            bg="#2563eb",
-            fg="#ffffff",
-            activebackground="#1d4ed8",
-            font=("Segoe UI", 10, "bold"),
-        )
-        sign_btn.pack(side=tk.RIGHT)
-
-        # Keyboard shortcuts: Enter to submit, Esc to cancel
-        modal.bind("<Return>", submit)
-        modal.bind("<Escape>", lambda e: modal.destroy())
-
-        username_entry.focus_set()
-        modal.wait_window()
-        return self.user
+from core.passwords import MIN_PASSWORD_LENGTH
+from db import database
+from ui import theme as visual
+from ui.widgets import ActionButton
 
 
 class LoginFrame(ttk.Frame):
@@ -84,94 +13,199 @@ class LoginFrame(ttk.Frame):
         super().__init__(master, padding=16)
         self.on_success = on_success
         self.on_cancel = on_cancel
+        self._pending_credentials = None
         self._build_ui()
+        self.clear_fields()
 
     def _build_ui(self) -> None:
-        ttk.Label(self, text="Sign in", font=("Segoe UI", 18, "bold")).pack(anchor="w")
-        ttk.Label(self, text="Enter credentials to continue.").pack(anchor="w", pady=(4, 12))
-
+        self.configure(padding=0)
+        card = ttk.Frame(self, padding=24, style="Panel.TFrame")
+        card.place(relx=0.5, rely=0.5, anchor="center", width=440)
+        ttk.Label(
+            card,
+            text="TINDAHAN",
+            style="Panel.TLabel",
+            foreground=visual.PRIMARY,
+            font=(visual.FONT, 10, "bold"),
+        ).pack(anchor="w")
+        self.title_var = tk.StringVar()
+        self.description_var = tk.StringVar()
+        self.help_var = tk.StringVar()
+        ttk.Label(
+            card,
+            textvariable=self.title_var,
+            style="Panel.TLabel",
+            font=(visual.FONT, 24, "bold"),
+        ).pack(anchor="w", pady=(8, 4))
+        ttk.Label(
+            card,
+            textvariable=self.description_var,
+            style="Panel.TLabel",
+            foreground=visual.MUTED,
+            wraplength=360,
+        ).pack(anchor="w", pady=(0, 16))
         self.username_var = tk.StringVar()
         self.password_var = tk.StringVar()
+        self.confirm_var = tk.StringVar()
         self.show_password_var = tk.BooleanVar()
         self.keep_signed_in_var = tk.BooleanVar()
-
-        ttk.Label(self, text="Username:").pack(anchor="w")
-        self.username_entry = ttk.Entry(self, textvariable=self.username_var)
-        self.username_entry.pack(fill=tk.X, pady=4)
-
-        ttk.Label(self, text="Password:").pack(anchor="w")
-        self.password_entry = ttk.Entry(self, textvariable=self.password_var, show="*")
-        self.password_entry.pack(fill=tk.X, pady=4)
-
-        # Checkboxes row
-        checkbox_row = ttk.Frame(self)
-        checkbox_row.pack(fill=tk.X, pady=(8, 0))
-
-        def toggle_password_visibility(*args):
-            show = self.show_password_var.get()
-            self.password_entry.config(show="" if show else "*")
-
-        show_pwd_check = ttk.Checkbutton(
-            checkbox_row,
+        self.error_var = tk.StringVar()
+        ttk.Label(card, text="Username", style="Panel.TLabel").pack(anchor="w")
+        self.username_entry = ttk.Entry(card, textvariable=self.username_var)
+        self.username_entry.pack(fill="x", pady=(6, 12))
+        self.password_label = ttk.Label(card, text="Password", style="Panel.TLabel")
+        self.password_label.pack(anchor="w")
+        self.password_entry = ttk.Entry(card, textvariable=self.password_var, show="•")
+        self.password_entry.pack(fill="x", pady=(6, 10))
+        self.confirm_frame = ttk.Frame(card, style="Panel.TFrame")
+        ttk.Label(
+            self.confirm_frame, text="Confirm password", style="Panel.TLabel"
+        ).pack(anchor="w")
+        self.confirm_entry = ttk.Entry(
+            self.confirm_frame, textvariable=self.confirm_var, show="•"
+        )
+        self.confirm_entry.pack(fill="x", pady=(6, 10))
+        self.options = ttk.Frame(card, style="Panel.TFrame")
+        self.options.pack(fill="x")
+        ttk.Checkbutton(
+            self.options,
             text="Show password",
             variable=self.show_password_var,
-            command=toggle_password_visibility,
+            command=self._toggle_password,
+        ).pack(side="left")
+        self.remember_checkbox = ttk.Checkbutton(
+            self.options, text="Remember me", variable=self.keep_signed_in_var
         )
-        show_pwd_check.pack(side=tk.LEFT)
-
-        keep_signed_check = ttk.Checkbutton(
-            checkbox_row,
-            text="Keep me signed in",
-            variable=self.keep_signed_in_var,
-            command=self._on_keep_signed_in_toggle,
+        ttk.Label(
+            card,
+            textvariable=self.help_var,
+            style="Panel.TLabel",
+            foreground=visual.MUTED,
+            font=(visual.FONT, 9),
+            wraplength=360,
+        ).pack(anchor="w", pady=(6, 6))
+        ttk.Label(
+            card,
+            textvariable=self.error_var,
+            style="Panel.TLabel",
+            foreground="#be123c",
+            wraplength=360,
+        ).pack(fill="x")
+        self.signin_button = ActionButton(
+            card, text="Sign in", variant="Primary", command=self._submit
         )
-        keep_signed_check.pack(side=tk.LEFT, padx=(16, 0))
+        self.signin_button.pack(fill="x", pady=(8, 0))
+        ActionButton(
+            card, text="Close application", variant="Quiet", command=self._cancel
+        ).pack(fill="x", pady=(8, 0))
+        self.username_entry.bind("<Return>", lambda e: self.password_entry.focus_set())
+        self.password_entry.bind("<Return>", self._password_return)
+        self.confirm_entry.bind("<Return>", lambda e: self._submit())
 
-        btn_row = ttk.Frame(self)
-        btn_row.pack(fill=tk.X, pady=(12, 0))
-        cancel_btn = tk.Button(btn_row, text="Cancel", command=self._cancel, bg="#9ca3af")
-        cancel_btn.pack(side=tk.RIGHT, padx=(8, 0))
-        sign_btn = tk.Button(btn_row, text="Sign In", command=self._submit, bg="#2563eb", fg="#fff")
-        sign_btn.pack(side=tk.RIGHT)
+    def _toggle_password(self) -> None:
+        for entry in (self.password_entry, self.confirm_entry):
+            entry.configure(show="" if self.show_password_var.get() else "•")
 
-        self.username_entry.focus_set()
+    def _password_return(self, _event=None) -> None:
+        if self.mode == "login":
+            self._submit()
+        else:
+            self.confirm_entry.focus_set()
 
-        # keyboard bindings scoped to the login form only
-        self.username_entry.bind('<Return>', lambda e: self._submit())
-        self.password_entry.bind('<Return>', lambda e: self._submit())
-        self.bind('<Escape>', lambda e: self._cancel())
-
-    def _on_keep_signed_in_toggle(self) -> None:
-        """Show verification dialog when Keep Me Signed In is toggled on."""
-        if self.keep_signed_in_var.get():
-            result = messagebox.askyesno(
-                "Keep Me Signed In",
-                "If you enable this option, the app will automatically open with your account next time.\n\n"
-                "⚠️  Only enable this on a personal or secure device.\n"
-                "Make sure to log out before leaving the app unattended.\n\n"
-                "Do you want to keep this device signed in?",
-                parent=self,
+    def _set_mode(self, mode: str) -> None:
+        self.mode = mode
+        self.username_entry.configure(
+            state="readonly" if mode == "password_change" else "normal"
+        )
+        self.password_label.configure(
+            text="New password" if mode == "password_change" else "Password"
+        )
+        if mode == "login":
+            self.confirm_frame.pack_forget()
+            self.remember_checkbox.pack(side="right")
+            self.title_var.set("Welcome back")
+            self.description_var.set("Sign in to your store workspace.")
+            self.help_var.set("Use Remember me only on a trusted device.")
+            self.signin_button.configure(text="Sign in")
+        else:
+            self.confirm_frame.pack(fill="x", before=self.options)
+            self.remember_checkbox.pack_forget()
+            self.keep_signed_in_var.set(False)
+            self.help_var.set(
+                f"Use at least {MIN_PASSWORD_LENGTH} characters. A longer passphrase is easier to remember."
             )
-            if not result:
-                self.keep_signed_in_var.set(False)
+            if mode == "setup":
+                self.title_var.set("Set up your store")
+                self.description_var.set(
+                    "Create your owner account. This account can manage users and store settings."
+                )
+                self.signin_button.configure(text="Create owner account")
+            else:
+                self.title_var.set("Update password")
+                self.description_var.set(
+                    "This account uses the old shared default. Choose your own password to continue."
+                )
+                self.signin_button.configure(text="Save password and sign in")
 
     def _submit(self) -> None:
         username = self.username_var.get().strip()
-        password = self.password_var.get().strip()
+        password = self.password_var.get()
+        self.error_var.set("")
+        if self.mode in {"setup", "password_change"}:
+            if password != self.confirm_var.get():
+                self.error_var.set("The passwords do not match.")
+                return
+            if error := auth.password_error(password):
+                self.error_var.set(error)
+                return
+            if self.mode == "setup":
+                try:
+                    user = auth.create_initial_admin(username, password)
+                except ValueError as exc:
+                    if not auth.needs_initial_setup():
+                        self.clear_fields()
+                    self.error_var.set(str(exc))
+                    return
+            else:
+                username, old_password = self._pending_credentials
+                if not auth.change_password(username, old_password, password):
+                    self.error_var.set(
+                        "The account changed. Close and reopen the app, then sign in again."
+                    )
+                    return
+                user = auth.verify_user(username, password)
+            self._finish_sign_in(user)
+            return
+
         user = auth.verify_user(username, password)
         if user is None:
-            messagebox.showerror("Login failed", "Invalid username or password", parent=self)
+            self.error_var.set("The username or password is incorrect.")
+            self.password_entry.focus_set()
             return
-        
-        # Store persistent login if checkbox is enabled
-        if self.keep_signed_in_var.get():
-            from db import database
-            database.set_setting("persistent_login_enabled", "1")
-            database.set_setting("persistent_login_username", username)
-        else:
-            from db import database
+        if user["must_change_password"]:
+            self._pending_credentials = (username, password)
+            self.password_var.set("")
+            self.confirm_var.set("")
+            self.show_password_var.set(False)
+            self._toggle_password()
+            self._set_mode("password_change")
             database.set_setting("persistent_login_enabled", "0")
-        
+            self.password_entry.focus_set()
+            return
+        self._finish_sign_in(user)
+
+    def _finish_sign_in(self, user: dict | None) -> None:
+        if user is None or user.get("must_change_password"):
+            self.error_var.set("Sign in again to continue.")
+            return
+        remember = self.keep_signed_in_var.get()
+        database.set_setting("persistent_login_enabled", "1" if remember else "0")
+        database.set_setting(
+            "persistent_login_username", user["username"] if remember else ""
+        )
+        self.password_var.set("")
+        self.confirm_var.set("")
+        self._pending_credentials = None
         if callable(self.on_success):
             self.on_success(user)
 
@@ -180,10 +214,14 @@ class LoginFrame(ttk.Frame):
             self.on_cancel()
 
     def clear_fields(self) -> None:
-        """Clear the login form fields."""
+        """Reset the form and select account setup only for an empty user table."""
+        self._pending_credentials = None
+        self.error_var.set("")
         self.username_var.set("")
         self.password_var.set("")
+        self.confirm_var.set("")
         self.show_password_var.set(False)
         self.keep_signed_in_var.set(False)
-        self.password_entry.config(show="*")
+        self._toggle_password()
+        self._set_mode("setup" if auth.needs_initial_setup() else "login")
         self.username_entry.focus_set()

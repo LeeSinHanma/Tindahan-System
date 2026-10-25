@@ -2,17 +2,21 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from core import debt_tracker
-from .theme_manager import ThemeManager
+from ui import theme as visual
+from ui.widgets import (
+    ActionButton,
+    AdaptivePanels,
+    FlowFrame,
+    center_dialog,
+    page_header,
+    table,
+)
 
 
 class DebtTrackerFrame(ttk.Frame):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master, padding=14)
-        top_level = master.winfo_toplevel()
-        screen_w = top_level.winfo_screenwidth()
-        screen_h = top_level.winfo_screenheight()
-        self.compact_layout = screen_w < 1400 or screen_h < 820
-        self.theme = ThemeManager(self.compact_layout)
+        self.theme = visual.get_theme()
         self.selected_customer: str | None = None
         self.selected_debt_id: int | None = None
         self.person_var = tk.StringVar()
@@ -27,186 +31,199 @@ class DebtTrackerFrame(ttk.Frame):
         self.refresh()
 
     def _build_ui(self) -> None:
-        header = ttk.Frame(self)
-        header.pack(fill=tk.X)
-
-        ttk.Label(header, text="Debt Tracker", font=("Segoe UI", self.theme.heading_huge, "bold")).pack(anchor="w")
-        ttk.Label(
-            header,
-            text="View customer accounts and manage individual debts.",
-            font=("Segoe UI", self.theme.body_medium),
-        ).pack(anchor="w", pady=(4, 0))
-
-        # Customers section
-        customers_label = ttk.Label(header, text="Customers", font=("Segoe UI", self.theme.body_medium, "bold"))
-        customers_label.pack(anchor="w", pady=(12, 8))
-
-        customers_frame = ttk.Frame(self)
-        customers_frame.pack(fill=tk.BOTH, expand=True)
-        customers_frame.rowconfigure(0, weight=1)
-        customers_frame.columnconfigure(0, weight=2)
-        customers_frame.columnconfigure(1, weight=3)
-
-        # Left panel: Customer list
-        left_panel = ttk.Frame(customers_frame)
-        left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-        left_panel.rowconfigure(1, weight=1)
-
-        ttk.Label(left_panel, text="Customer Accounts", font=("Segoe UI", self.theme.body_medium, "bold")).pack(anchor="w", pady=(0, 6))
-
-        # New customer form
-        new_cust_row = ttk.Frame(left_panel)
-        new_cust_row.pack(fill=tk.X, pady=(0, 6))
-        new_cust_entry = ttk.Entry(new_cust_row, textvariable=self.new_customer_var)
-        new_cust_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self._create_button(new_cust_row, "New Customer", self._add_customer, "#4f46e5", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).pack(side=tk.LEFT, padx=(6, 0))
-        self._create_button(new_cust_row, "Delete Customer", self._delete_customer, "#dc2626", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).pack(side=tk.LEFT, padx=(6, 0))
-
-        customer_table_frame = ttk.Frame(left_panel)
-        customer_table_frame.pack(fill=tk.BOTH, expand=True)
-
-        columns = ("customer", "total", "pending")
-        self.customer_table = ttk.Treeview(customer_table_frame, columns=columns, show="headings", height=12)
-        self.customer_table.heading("customer", text="Customer")
-        self.customer_table.heading("total", text="Total Debt")
-        self.customer_table.heading("pending", text="Items")
-
-        self.customer_table.column("customer", width=self.theme.table_column_width_name)
-        self.customer_table.column("total", width=100, anchor=tk.E)
-        self.customer_table.column("pending", width=70, anchor=tk.CENTER)
-        self.customer_table.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
-
-        customer_scroll = ttk.Scrollbar(customer_table_frame, orient=tk.VERTICAL, command=self.customer_table.yview)
-        customer_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.customer_table.configure(yscrollcommand=customer_scroll.set)
+        self.configure(padding=0)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
+        page_header(
+            self, "Customers & Debt", "Review customer balances and record payments."
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 16))
+        self.panels = AdaptivePanels(self)
+        self.panels.grid(row=1, column=0, sticky="nsew")
+        left = self.panels.add("Customers")
+        right = self.panels.add("Customer details")
+        self.detail_panel = right
+        left.columnconfigure(0, weight=1)
+        left.rowconfigure(3, weight=1)
+        ttk.Label(left, text="Customer accounts", style="Section.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 12)
+        )
+        search = ttk.Entry(left, textvariable=self.new_customer_var)
+        search.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        actions = FlowFrame(left)
+        actions.grid(row=2, column=0, sticky="ew", pady=(0, 8))
+        actions.add(
+            ActionButton(
+                actions,
+                text="New customer",
+                variant="Primary",
+                command=self._open_customer_dialog,
+            )
+        )
+        self.delete_customer_button = actions.add(
+            ActionButton(
+                actions,
+                text="Delete",
+                variant="Danger",
+                command=self._delete_customer,
+                state="disabled",
+            )
+        )
+        box, self.customer_table = table(
+            left,
+            ("customer", "total", "pending"),
+            ("Customer", "Balance", "Unpaid"),
+            (180, 110, 65),
+            empty_text="No matching customers. Create a customer account above.",
+            height=4,
+        )
+        box.grid(row=3, column=0, sticky="nsew")
         self.customer_table.bind("<<TreeviewSelect>>", self._on_customer_select)
-
-        # Right panel: Customer details and debts
-        right_panel = ttk.LabelFrame(customers_frame, text="Customer Details", padding=10)
-        right_panel.grid(row=0, column=1, sticky="nsew")
-        right_panel.rowconfigure(3, weight=1)
-
-        # Customer info
-        info_frame = ttk.Frame(right_panel)
-        info_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-
-        ttk.Label(info_frame, text="Customer:", font=("Segoe UI", self.theme.body_small, "bold")).pack(side=tk.LEFT)
-        ttk.Label(info_frame, textvariable=self.person_var, font=("Segoe UI", self.theme.body_small)).pack(side=tk.LEFT, padx=(8, 0))
-
-        # Add debt form
-        form_frame = ttk.LabelFrame(right_panel, text="Add New Debt", padding=8)
-        form_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
-        form_frame.columnconfigure(1, weight=1)
-
-        ttk.Label(form_frame, text="Amount:", font=("Segoe UI", self.theme.body_small, "bold")).grid(row=0, column=0, sticky="w")
-        amount_entry = ttk.Entry(form_frame, textvariable=self.amount_var, font=("Segoe UI", self.theme.body_small))
-        amount_entry.grid(row=0, column=1, sticky="ew", padx=(8, 0))
-
-        ttk.Label(form_frame, text="Description:", font=("Segoe UI", self.theme.body_small, "bold")).grid(row=1, column=0, sticky="w", pady=(6, 0))
-        desc_entry = ttk.Entry(form_frame, textvariable=self.description_var, font=("Segoe UI", self.theme.body_small))
-        desc_entry.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(6, 0))
-
-        ttk.Checkbutton(
-            form_frame,
-            text="Record as sale",
-            variable=self.sale_linked_var,
-        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 0))
-
-        self._create_button(form_frame, "Add Debt", self._add_debt_to_customer, "#16a34a", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
-
-        # Debts list for selected customer
-        debts_label = ttk.Label(right_panel, text="Debts", font=("Segoe UI", self.theme.body_medium, "bold"))
-        debts_label.grid(row=2, column=0, sticky="w", pady=(8, 6))
-
-        debts_table_frame = ttk.Frame(right_panel)
-        debts_table_frame.grid(row=3, column=0, sticky="nsew")
-
-        debt_columns = ("id", "amount", "status", "description", "date")
-        self.debt_table = ttk.Treeview(debts_table_frame, columns=debt_columns, show="headings", height=8)
-        self.debt_table.heading("id", text="ID")
-        self.debt_table.heading("amount", text="Amount")
-        self.debt_table.heading("status", text="Status")
-        self.debt_table.heading("description", text="Description")
-        self.debt_table.heading("date", text="Date")
-
-        self.debt_table.column("id", width=40, anchor=tk.CENTER)
-        self.debt_table.column("amount", width=80, anchor=tk.E)
-        self.debt_table.column("status", width=70, anchor=tk.CENTER)
-        self.debt_table.column("description", width=120)
-        self.debt_table.column("date", width=90, anchor=tk.CENTER)
-        self.debt_table.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
-
-        debt_scroll = ttk.Scrollbar(debts_table_frame, orient=tk.VERTICAL, command=self.debt_table.yview)
-        debt_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.debt_table.configure(yscrollcommand=debt_scroll.set)
+        self.customer_table.bind("<Double-1>", lambda e: self.panels.show(right))
+        self.customer_table.bind("<Return>", lambda e: self.panels.show(right))
+        right.columnconfigure(0, weight=1)
+        right.rowconfigure(3, weight=1)
+        self.person_var.set("Select a customer")
+        ttk.Label(right, textvariable=self.person_var, style="Section.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 12)
+        )
+        form = ttk.Frame(right)
+        form.grid(row=1, column=0, sticky="ew")
+        form.columnconfigure(1, weight=1)
+        ttk.Label(form, text="Debt amount").grid(
+            row=0, column=0, sticky="w", padx=(0, 8)
+        )
+        self.amount_entry = ttk.Entry(form, textvariable=self.amount_var, width=10)
+        self.amount_entry.grid(row=0, column=1, sticky="ew")
+        ttk.Label(form, text="Description").grid(
+            row=1, column=0, sticky="w", padx=(0, 8), pady=(6, 0)
+        )
+        self.description_entry = ttk.Entry(form, textvariable=self.description_var)
+        self.description_entry.grid(row=1, column=1, sticky="ew", pady=(6, 0))
+        tools = FlowFrame(right)
+        tools.grid(row=2, column=0, sticky="ew", pady=(8, 8))
+        tools.add(
+            ttk.Checkbutton(tools, text="Record as sale", variable=self.sale_linked_var)
+        )
+        self.add_debt_button = tools.add(
+            ActionButton(
+                tools,
+                text="Add debt",
+                command=self._add_debt_to_customer,
+                state="disabled",
+            )
+        )
+        box, self.debt_table = table(
+            right,
+            ("id", "amount", "status", "description", "date"),
+            ("ID", "Amount", "Status", "Description", "Date"),
+            (40, 90, 85, 160, 100),
+            displaycolumns=("amount", "status", "description", "date"),
+            empty_text="Select a customer to review their debt history.",
+            height=3,
+        )
+        box.grid(row=3, column=0, sticky="nsew")
         self.debt_table.bind("<<TreeviewSelect>>", self._on_debt_select)
-
-        self.debt_table.tag_configure("pending", background="#fff2cc")
-        self.debt_table.tag_configure("paid", background="#d1fae5")
-
-        # Debt actions
-        action_frame = ttk.Frame(right_panel)
-        action_frame.grid(row=4, column=0, sticky="ew", pady=(8, 0))
-
-        self._create_button(action_frame, "Mark Paid", self._mark_debt_paid, "#0ea5e9", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).pack(side=tk.LEFT)
-        self._create_button(action_frame, "Delete", self._delete_debt, "#dc2626", self.theme.button_padding_x, self.theme.button_padding_y, self.theme.body_small).pack(side=tk.LEFT, padx=(6, 0))
-        # Pay by amount controls
-        pay_frame = ttk.Frame(right_panel)
-        pay_frame.grid(row=5, column=0, sticky="ew", pady=(8, 0))
-        pay_frame.columnconfigure(0, weight=1)
+        self.debt_table.tag_configure("pending", background="#fffbeb")
+        self.debt_table.tag_configure("paid", background="#ecfdf5")
+        debt_actions = FlowFrame(right)
+        debt_actions.grid(row=4, column=0, sticky="ew", pady=(8, 0))
+        self.paid_button = debt_actions.add(
+            ActionButton(
+                debt_actions,
+                text="Mark paid",
+                command=self._mark_debt_paid,
+                state="disabled",
+            )
+        )
+        self.delete_debt_button = debt_actions.add(
+            ActionButton(
+                debt_actions,
+                text="Delete debt",
+                variant="Danger",
+                command=self._delete_debt,
+                state="disabled",
+            )
+        )
+        pay = ttk.Frame(right)
+        pay.grid(row=5, column=0, sticky="ew", pady=(8, 0))
+        pay.columnconfigure(1, weight=1)
+        ttk.Label(pay, text="Payment").grid(row=0, column=0, padx=(0, 8))
         self.pay_amount_var = tk.StringVar()
-        ttk.Label(pay_frame, text="Pay Amount:", font=("Segoe UI", self.theme.body_small, "bold")).grid(row=0, column=0, sticky="w")
-        pay_entry = ttk.Entry(pay_frame, textvariable=self.pay_amount_var)
-        pay_entry.grid(row=0, column=1, sticky="ew", padx=(8, 0))
-        self.pay_button = tk.Button(
-            pay_frame,
-            text="Pay",
+        pay_entry = ttk.Entry(pay, textvariable=self.pay_amount_var, width=10)
+        pay_entry.grid(row=0, column=1, sticky="ew")
+        self.pay_button = ActionButton(
+            pay,
+            text="Record payment",
+            variant="Primary",
             command=self._pay_amount_for_customer,
-            bg="#059669",
-            fg="white",
-            relief=tk.FLAT,
-            padx=self.theme.button_padding_x,
-            pady=self.theme.button_padding_y,
+            state="disabled",
         )
         self.pay_button.grid(row=0, column=2, padx=(8, 0))
-        pay_entry.bind("<Return>", lambda _event: self._pay_amount_for_customer() or "break")
-        pay_entry.bind("<KeyRelease>", lambda _event: self._update_pay_button_state())
-
-        footer = ttk.Frame(self)
-        footer.pack(fill=tk.X, pady=(8, 0))
-        ttk.Label(footer, textvariable=self.status_var).pack(side=tk.LEFT)
-
-    def _create_button(self, parent: tk.Widget, text: str, command, color: str, padx: int, pady: int, font_size: int) -> tk.Button:
-        return tk.Button(
-            parent,
-            text=text,
-            command=command,
-            bg=color,
-            fg="white",
-            activebackground=color,
-            activeforeground="white",
-            relief=tk.FLAT,
-            padx=padx,
-            pady=pady,
-            font=("Segoe UI", font_size, "bold"),
-            cursor="hand2",
+        pay_entry.bind("<Return>", lambda e: self._pay_amount_for_customer())
+        self.pay_amount_var.trace_add(
+            "write", lambda *args: self._update_pay_button_state()
+        )
+        status = ttk.Label(
+            self, textvariable=self.status_var, style="Muted.TLabel", wraplength=700
+        )
+        status.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        self.bind(
+            "<Configure>",
+            lambda e: status.configure(wraplength=max(200, e.width)),
+            add="+",
         )
 
-    def _add_customer(self) -> None:
-        name = self.new_customer_var.get().strip()
-        if not name:
-            messagebox.showerror("Invalid input", "Enter a customer name", parent=self)
-            return
-        if debt_tracker.add_customer(name):
+    def _open_customer_dialog(self):
+        modal = tk.Toplevel(self)
+        modal.title("New customer")
+        modal.transient(self.winfo_toplevel())
+        modal.resizable(False, False)
+        center_dialog(modal, 440, 260)
+        content = ttk.Frame(modal, padding=24)
+        content.pack(fill="both", expand=True)
+        ttk.Label(content, text="New customer", style="Section.TLabel").pack(
+            anchor="w", pady=(0, 16)
+        )
+        name = tk.StringVar()
+        error = tk.StringVar()
+        entry = ttk.Entry(content, textvariable=name)
+        entry.pack(fill="x")
+        ttk.Label(
+            content, textvariable=error, foreground="#be123c", wraplength=380
+        ).pack(anchor="w", pady=8)
+
+        def submit():
+            customer_name = name.get().strip()
+            if not customer_name or not debt_tracker.add_customer(customer_name):
+                error.set("Enter a unique customer name.")
+                return
             self.new_customer_var.set("")
-            self.status_var.set(f"Customer '{name}' added")
+            self.selected_customer = customer_name
+            self.person_var.set(customer_name)
             self.refresh()
-        else:
-            messagebox.showerror("Invalid input", "Failed to add customer or customer already exists", parent=self)
+            modal.destroy()
+            self.panels.show(self.detail_panel)
+
+        ActionButton(
+            content, text="Create customer", variant="Primary", command=submit
+        ).pack(anchor="e")
+        modal.bind("<Return>", lambda e: submit())
+        modal.grab_set()
+        entry.focus_set()
+
+    def _update_customer_actions(self):
+        state = "normal" if self.selected_customer else "disabled"
+        self.add_debt_button.configure(state=state)
+        self.delete_customer_button.configure(state=state)
+        selected = bool(self.debt_table.selection())
+        for button in (self.paid_button, self.delete_debt_button):
+            button.configure(state="normal" if selected else "disabled")
 
     def _delete_customer(self) -> None:
         if not self.selected_customer:
-            messagebox.showerror("Invalid input", "Please select a customer to delete", parent=self)
+            messagebox.showerror(
+                "Invalid input", "Please select a customer to delete", parent=self
+            )
             return
 
         customer_name = self.selected_customer
@@ -235,7 +252,9 @@ class DebtTrackerFrame(ttk.Frame):
                 self.debt_table.delete(row_id)
             self.refresh()
         else:
-            messagebox.showerror("Delete failed", "Failed to delete customer", parent=self)
+            messagebox.showerror(
+                "Delete failed", "Failed to delete customer", parent=self
+            )
 
     def _on_customer_select(self, _event: tk.Event) -> None:
         selected = self.customer_table.selection()
@@ -246,12 +265,17 @@ class DebtTrackerFrame(ttk.Frame):
             self.amount_var.set("")
             self.description_var.set("")
             self._load_customer_debts()
+            self._update_customer_actions()
+            self._update_pay_button_state()
 
     def _on_debt_select(self, _event: tk.Event) -> None:
         selected = self.debt_table.selection()
         if selected:
             values = self.debt_table.item(selected[0], "values")
             self.selected_debt_id = int(values[0])
+        else:
+            self.selected_debt_id = None
+        self._update_customer_actions()
 
     def _load_customer_debts(self) -> None:
         if not self.selected_customer:
@@ -260,6 +284,9 @@ class DebtTrackerFrame(ttk.Frame):
         for row_id in self.debt_table.get_children():
             self.debt_table.delete(row_id)
 
+        self.selected_debt_id = None
+        self.debt_table.empty_text = "This customer has no debt records."
+        self.debt_table._refresh_empty()
         debts = debt_tracker.get_customer_debts(self.selected_customer)
         for debt in debts:
             status = "PAID" if debt["is_paid"] else "PENDING"
@@ -280,7 +307,9 @@ class DebtTrackerFrame(ttk.Frame):
 
     def _add_debt_to_customer(self) -> None:
         if not self.selected_customer:
-            messagebox.showerror("Invalid input", "Please select a customer first", parent=self)
+            messagebox.showerror(
+                "Invalid input", "Please select a customer first", parent=self
+            )
             return
 
         amount_str = self.amount_var.get().strip()
@@ -293,21 +322,29 @@ class DebtTrackerFrame(ttk.Frame):
         try:
             amount = float(amount_str)
         except ValueError:
-            messagebox.showerror("Invalid input", "Please enter a valid amount", parent=self)
+            messagebox.showerror(
+                "Invalid input", "Please enter a valid amount", parent=self
+            )
             return
 
-        if debt_tracker.add_debt(self.selected_customer, amount, description, self.sale_linked_var.get()):
+        if debt_tracker.add_debt(
+            self.selected_customer, amount, description, self.sale_linked_var.get()
+        ):
             self.amount_var.set("")
             self.description_var.set("")
             self.sale_linked_var.set(True)
-            self.status_var.set(f"Added PHP {amount:.2f} debt for {self.selected_customer}")
+            self.status_var.set(
+                f"Added PHP {amount:.2f} debt for {self.selected_customer}"
+            )
             self.refresh()
         else:
             messagebox.showerror("Invalid input", "Failed to add debt", parent=self)
 
     def _pay_amount_for_customer(self) -> None:
         if not self.selected_customer:
-            messagebox.showerror("Invalid input", "Select a customer first", parent=self)
+            messagebox.showerror(
+                "Invalid input", "Select a customer first", parent=self
+            )
             return
 
         amt_text = self.pay_amount_var.get().strip()
@@ -318,7 +355,9 @@ class DebtTrackerFrame(ttk.Frame):
         try:
             amount = float(amt_text)
         except ValueError:
-            messagebox.showerror("Invalid input", "Enter a valid numeric amount", parent=self)
+            messagebox.showerror(
+                "Invalid input", "Enter a valid numeric amount", parent=self
+            )
             return
 
         total_debt = debt_tracker.get_customer_total_debt(self.selected_customer)
@@ -329,6 +368,7 @@ class DebtTrackerFrame(ttk.Frame):
                 parent=self,
             )
             self._update_pay_button_state()
+            self._update_customer_actions()
             return
 
         confirm_message = f"Apply PHP {amount:.2f} payment to {self.selected_customer}?"
@@ -359,15 +399,21 @@ class DebtTrackerFrame(ttk.Frame):
                 f"Applied PHP {applied:.2f} to {self.selected_customer}. Change: PHP {remaining:.2f}"
             )
         else:
-            self.status_var.set(f"Applied PHP {applied:.2f} to {self.selected_customer}. Remaining: PHP {remaining:.2f}")
+            self.status_var.set(
+                f"Applied PHP {applied:.2f} to {self.selected_customer}. Remaining: PHP {remaining:.2f}"
+            )
         self.refresh()
 
     def _mark_debt_paid(self) -> None:
         if not self.selected_debt_id:
-            messagebox.showerror("Invalid input", "Please select a debt to mark as paid", parent=self)
+            messagebox.showerror(
+                "Invalid input", "Please select a debt to mark as paid", parent=self
+            )
             return
 
-        if not messagebox.askyesno("Confirm Payment", "Mark this selected debt as paid?", parent=self):
+        if not messagebox.askyesno(
+            "Confirm Payment", "Mark this selected debt as paid?", parent=self
+        ):
             return
 
         if debt_tracker.mark_paid(self.selected_debt_id):
@@ -379,7 +425,9 @@ class DebtTrackerFrame(ttk.Frame):
 
     def _delete_debt(self) -> None:
         if not self.selected_debt_id:
-            messagebox.showerror("Invalid input", "Please select a debt to delete", parent=self)
+            messagebox.showerror(
+                "Invalid input", "Please select a debt to delete", parent=self
+            )
             return
 
         if messagebox.askyesno("Confirm", "Delete this debt entry?"):
@@ -398,7 +446,9 @@ class DebtTrackerFrame(ttk.Frame):
         if self.selected_customer:
             try:
                 amount = float(self.pay_amount_var.get().strip())
-                total_debt = debt_tracker.get_customer_total_debt(self.selected_customer)
+                total_debt = debt_tracker.get_customer_total_debt(
+                    self.selected_customer
+                )
                 enabled = amount > 0 and total_debt > 0
             except ValueError:
                 enabled = False
@@ -438,3 +488,4 @@ class DebtTrackerFrame(ttk.Frame):
         total_debt = debt_tracker.get_total_debt()
         self.status_var.set(f"Total pending debt: PHP {total_debt:.2f}")
         self._update_pay_button_state()
+        self._update_customer_actions()

@@ -1,0 +1,6 @@
+# Preserve the exact bytes recorded by the third-party notice checksum manifest.
+packaging/third_party/licenses/** -text
+packaging/third_party/catalog.json text eol=lf
+packaging/third_party/sources.json text eol=lf
+packaging/third_party/profiles/** text eol=lf
+THIRD_PARTY_NOTICES.md text eol=lf

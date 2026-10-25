@@ -59,3 +59,6 @@ Desktop.ini
 *.sqlite3
 *.db-wal
 *.db-shm
+
+# User-selected checkout audio must not be published with the application.
+assets/sounds/

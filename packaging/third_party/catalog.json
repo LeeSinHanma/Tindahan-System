@@ -1,0 +1,881 @@
+{
+  "schema": 1,
+  "reviewed": "2026-10-25",
+  "components": [
+    {
+      "id": "pillow-dav1d",
+      "name": "dav1d (inside libavif)",
+      "version": "1.5.3 (b546257)",
+      "license": "BSD-2-Clause",
+      "homepage": "https://code.videolan.org/videolan/dav1d",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-dav1d/COPYING",
+          "origin": "https://raw.githubusercontent.com/videolan/dav1d/b546257/COPYING",
+          "sha256": "dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5"
+        },
+        {
+          "path": "licenses/pillow-dav1d/THANKS.md",
+          "origin": "https://raw.githubusercontent.com/videolan/dav1d/b546257/THANKS.md",
+          "sha256": "82a263143bc882a628922140cc57671fd4d9f52130f46fe2ec84da9485e0a6ed"
+        },
+        {
+          "path": "licenses/pillow-dav1d/x86inc-notice.txt",
+          "origin": "https://raw.githubusercontent.com/videolan/dav1d/b546257/src/ext/x86/x86inc.asm",
+          "sha256": "76688518a348478616aee583c5bf0dc2e92c62d4f498f416706b3a08f2961328"
+        }
+      ]
+    },
+    {
+      "id": "pillow-lcms2",
+      "name": "Little CMS 2",
+      "version": "2.19.1",
+      "license": "MIT",
+      "homepage": "https://github.com/mm2/Little-CMS",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-lcms2/LICENSE",
+          "origin": "https://raw.githubusercontent.com/mm2/Little-CMS/lcms2.19.1/LICENSE",
+          "sha256": "6dbd60437f8ef91d8de1f08ad75882547fd4931bfcc3566a0735f28db1484d31"
+        }
+      ]
+    },
+    {
+      "id": "pillow-libXau",
+      "name": "libXau",
+      "version": "1.0.9-3.el8",
+      "license": "X11/MIT-style",
+      "homepage": "https://www.x.org/releases/individual/lib/libXau-1.0.9.tar.bz2",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-libXau/COPYING",
+          "origin": "https://www.x.org/releases/individual/lib/libXau-1.0.9.tar.bz2!/libXau-1.0.9/COPYING",
+          "sha256": "56abe29bb1d9806a9e04fa9f80fed2c0f18027594df3f098148d814aef6bddfa"
+        }
+      ]
+    },
+    {
+      "id": "pillow-libaom",
+      "name": "libaom (inside libavif)",
+      "version": "3.14.1",
+      "license": "BSD-2-Clause + patent grant",
+      "homepage": "https://aomedia.googlesource.com/aom/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-libaom/LICENSE",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/LICENSE?format=TEXT",
+          "sha256": "4764a286d8b2faeaf42f4418e7d7a28d58fc8fd4d00a3d0a7f44b0a4099de7f2"
+        },
+        {
+          "path": "licenses/pillow-libaom/PATENTS",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/PATENTS?format=TEXT",
+          "sha256": "661fb8e504744e95587b556b94a58343448300606a41bea8c7a9b97125696e61"
+        },
+        {
+          "path": "licenses/pillow-libaom/AUTHORS",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/AUTHORS?format=TEXT",
+          "sha256": "1bf4faf64255fc1ffe1428e56f58f36050eeaac47a6401e532ca15823d21e9ac"
+        },
+        {
+          "path": "licenses/pillow-libaom/third_party/fastfeat/LICENSE",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/third_party/fastfeat/LICENSE?format=TEXT",
+          "sha256": "499041ddee5227b6f29ca06c17803e5fe24d60f243c69635cd76b7ba08d0ddd5"
+        },
+        {
+          "path": "licenses/pillow-libaom/third_party/highway/LICENSE-BSD3",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/third_party/highway/LICENSE-BSD3?format=TEXT",
+          "sha256": "d25e82e26acd42ca3ccc9993622631163425b869b9e16284226d534cff6470f2"
+        },
+        {
+          "path": "licenses/pillow-libaom/third_party/libwebm/LICENSE.TXT",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/third_party/libwebm/LICENSE.TXT?format=TEXT",
+          "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf"
+        },
+        {
+          "path": "licenses/pillow-libaom/third_party/libwebm/PATENTS.TXT",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/third_party/libwebm/PATENTS.TXT?format=TEXT",
+          "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c"
+        },
+        {
+          "path": "licenses/pillow-libaom/third_party/libyuv/LICENSE",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/third_party/libyuv/LICENSE?format=TEXT",
+          "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"
+        },
+        {
+          "path": "licenses/pillow-libaom/third_party/vector/LICENSE",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/third_party/vector/LICENSE?format=TEXT",
+          "sha256": "ff6c857ce2708e87701323078aef115c1872a1f80a9649f86dc899b48083bc60"
+        },
+        {
+          "path": "licenses/pillow-libaom/third_party/x86inc/LICENSE",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/third_party/x86inc/LICENSE?format=TEXT",
+          "sha256": "719d8fa235f2068e0ae6d6a7dceb0a7720d7840f0f0ebed29957989e6ded3cd8"
+        },
+        {
+          "path": "licenses/pillow-libaom/third_party/x86inc/x86inc.asm",
+          "origin": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/third_party/x86inc/x86inc.asm?format=TEXT",
+          "sha256": "4fa5606ec63bfc9ee946f0b131c8efc2914c69db223637dc96ad19c2b1a579eb"
+        }
+      ]
+    },
+    {
+      "id": "pillow-libavif",
+      "name": "libavif",
+      "version": "1.4.2",
+      "license": "BSD-2-Clause + incorporated notices",
+      "homepage": "https://github.com/AOMediaCodec/libavif",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-libavif/LICENSE",
+          "origin": "https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.4.2/LICENSE",
+          "sha256": "165abf92cc04b39e80d29cadea7a6a7e8fddf59407d4ad2616507a7ebe8216f9"
+        }
+      ]
+    },
+    {
+      "id": "pillow-libjpeg-turbo",
+      "name": "libjpeg-turbo",
+      "version": "3.2.0",
+      "license": "BSD-3-Clause AND IJG AND Zlib",
+      "homepage": "https://github.com/libjpeg-turbo/libjpeg-turbo",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-libjpeg-turbo/LICENSE.md",
+          "origin": "https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.2.0/LICENSE.md",
+          "sha256": "ba6bceebcba0fdd35488477c2cca8c4632ce82c74dbfbc87d886ce6fc4433579"
+        },
+        {
+          "path": "licenses/pillow-libjpeg-turbo/README.ijg",
+          "origin": "https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.2.0/README.ijg",
+          "sha256": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6"
+        }
+      ]
+    },
+    {
+      "id": "pillow-liblzma",
+      "name": "liblzma (wheel copy)",
+      "version": "5.8.4",
+      "license": "0BSD",
+      "homepage": "https://github.com/tukaani-project/xz",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-liblzma/COPYING",
+          "origin": "https://raw.githubusercontent.com/tukaani-project/xz/v5.8.4/COPYING",
+          "sha256": "616a3ad264ce29b8f1cb97e53037b139d406899ca8d1f799651e17bfa09830b8"
+        },
+        {
+          "path": "licenses/pillow-liblzma/COPYING.0BSD",
+          "origin": "https://raw.githubusercontent.com/tukaani-project/xz/v5.8.4/COPYING.0BSD",
+          "sha256": "0b01625d853911cd0e2e088dcfb743261034a091bb379246cb25a14cc4c74bf1"
+        }
+      ]
+    },
+    {
+      "id": "pillow-libtiff",
+      "name": "libtiff",
+      "version": "4.7.2",
+      "license": "libtiff",
+      "homepage": "https://libtiff.gitlab.io/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-libtiff/LICENSE.md",
+          "origin": "https://raw.githubusercontent.com/libsdl-org/libtiff/v4.7.2/LICENSE.md",
+          "sha256": "0e27c2382d7b8147972bbb746e04059a1152c8d0fda9d03ef1399d1a433c4ade"
+        }
+      ]
+    },
+    {
+      "id": "pillow-libwebp",
+      "name": "libwebp, libwebpdemux, libwebpmux, libsharpyuv",
+      "version": "1.6.0",
+      "license": "BSD-3-Clause + patent grant",
+      "homepage": "https://chromium.googlesource.com/webm/libwebp/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-libwebp/COPYING",
+          "origin": "https://chromium.googlesource.com/webm/libwebp/+/v1.6.0/COPYING?format=TEXT",
+          "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf"
+        },
+        {
+          "path": "licenses/pillow-libwebp/PATENTS",
+          "origin": "https://chromium.googlesource.com/webm/libwebp/+/v1.6.0/PATENTS?format=TEXT",
+          "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c"
+        },
+        {
+          "path": "licenses/pillow-libwebp/AUTHORS",
+          "origin": "https://chromium.googlesource.com/webm/libwebp/+/v1.6.0/AUTHORS?format=TEXT",
+          "sha256": "f251be89fd442bd9d701360730aea163cc8e2076ff03528f59267dc2c4f8b60a"
+        }
+      ]
+    },
+    {
+      "id": "pillow-libxcb",
+      "name": "libxcb",
+      "version": "1.17.0",
+      "license": "X11/MIT-style",
+      "homepage": "https://xcb.freedesktop.org/dist/libxcb-1.17.0.tar.xz",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-libxcb/COPYING",
+          "origin": "https://xcb.freedesktop.org/dist/libxcb-1.17.0.tar.xz!/libxcb-1.17.0/COPYING",
+          "sha256": "c5ffbfeaa501071ceeb97b7de2c0d703fdaa35de01c0fb6cbac1c28453a3e9fd"
+        }
+      ]
+    },
+    {
+      "id": "pillow-libyuv",
+      "name": "libyuv",
+      "version": "1924 (644251f252a84bf8ce91ff0aca86a9b16b069ab8)",
+      "license": "BSD-3-Clause + patent grant",
+      "homepage": "https://chromium.googlesource.com/libyuv/libyuv/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-libyuv/LICENSE",
+          "origin": "<project>/build/license-audit/libyuv-1924/LICENSE",
+          "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"
+        },
+        {
+          "path": "licenses/pillow-libyuv/AUTHORS",
+          "origin": "<project>/build/license-audit/libyuv-1924/AUTHORS",
+          "sha256": "0c4a51c72a06b3431bb2b750e3b04dbe3694b22e2fcae6e370216424eec56d52"
+        },
+        {
+          "path": "licenses/pillow-libyuv/PATENTS",
+          "origin": "<project>/build/license-audit/libyuv-1924/PATENTS",
+          "sha256": "4da84211f947c6f9f7dd8fbce513e1522e01833407ae732b8c9a2bbb75fed495"
+        }
+      ]
+    },
+    {
+      "id": "pillow-openjpeg",
+      "name": "OpenJPEG",
+      "version": "2.5.4",
+      "license": "BSD-2-Clause",
+      "homepage": "https://github.com/uclouvain/openjpeg",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-openjpeg/LICENSE",
+          "origin": "https://raw.githubusercontent.com/uclouvain/openjpeg/v2.5.4/LICENSE",
+          "sha256": "a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6"
+        }
+      ]
+    },
+    {
+      "id": "pillow-pythoncapi-compat",
+      "name": "pythoncapi-compat (Pillow helper header)",
+      "version": "b4cf22061a629428ceb19927f903732b8c20ef87 (Pillow 13.0.0)",
+      "license": "0BSD",
+      "homepage": "https://github.com/python/pythoncapi-compat",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-pythoncapi-compat/COPYING",
+          "origin": "https://raw.githubusercontent.com/python/pythoncapi-compat/b4cf22061a629428ceb19927f903732b8c20ef87/COPYING",
+          "sha256": "3f2c1ffa76383a55ae0aac01c9737cd70050dff63e1f026694fbe9d662573c98"
+        }
+      ]
+    },
+    {
+      "id": "pillow-zstd",
+      "name": "Zstandard (wheel copy)",
+      "version": "1.5.7",
+      "license": "BSD-3-Clause (selected alternative)",
+      "homepage": "https://github.com/facebook/zstd",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/pillow-zstd/LICENSE",
+          "origin": "https://raw.githubusercontent.com/facebook/zstd/v1.5.7/LICENSE",
+          "sha256": "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8"
+        }
+      ]
+    },
+    {
+      "id": "python-charset-normalizer",
+      "name": "charset-normalizer",
+      "version": "3.5.2",
+      "license": "MIT",
+      "homepage": "https://github.com/jawah/charset_normalizer/blob/3.5.2/LICENSE",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/python-charset-normalizer/LICENSE",
+          "origin": "<project>/.venv/lib/python3.14/site-packages/charset_normalizer-3.5.2.dist-info/licenses/LICENSE",
+          "sha256": "6d0d41bfe170ac6c7dc248c9a63e254d0fb45a60d50a8257d0af92c6e249b887"
+        }
+      ]
+    },
+    {
+      "id": "python-pillow",
+      "name": "pillow",
+      "version": "13.0.0",
+      "license": "MIT-CMU",
+      "homepage": "https://pypi.org/project/pillow/13.0.0/#files",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/python-pillow/LICENSE",
+          "origin": "<project>/.venv/lib/python3.14/site-packages/pillow-13.0.0.dist-info/licenses/LICENSE",
+          "sha256": "dda12a98c1979cf3d94df1cff45d27a4cb3f04a60c76f76902ac54cac03ec0ce"
+        },
+        {
+          "path": "licenses/python-pillow/sboms/auditwheel.cdx.json",
+          "origin": "<project>/.venv/lib/python3.14/site-packages/pillow-13.0.0.dist-info/sboms/auditwheel.cdx.json",
+          "sha256": "583049cf7ad8d9fa9c949695ec46bcf5c5ee12b5097527b1ba297757fecbd987"
+        },
+        {
+          "path": "licenses/python-pillow/sboms/pillow-13.0.0.cdx.json",
+          "origin": "<project>/.venv/lib/python3.14/site-packages/pillow-13.0.0.dist-info/sboms/pillow-13.0.0.cdx.json",
+          "sha256": "fe1ca6e3a4f73e7018a3805a75a19377453f342d203712f37387ad6ee853fd44"
+        }
+      ]
+    },
+    {
+      "id": "python-pygame",
+      "name": "Pygame",
+      "version": "2.6.1",
+      "license": "LGPL-2.1-or-later",
+      "homepage": "https://www.pygame.org/",
+      "note": "Pygame is used for optional checkout audio. Complete corresponding source, application source and rebuild instructions accompany the app. The unused FreeSans font is excluded.",
+      "files": [
+        {
+          "path": "licenses/python-pygame/README.rst",
+          "origin": "pygame-2.6.1.tar.gz/README.rst",
+          "sha256": "46602e2266deca9f1d06cd8b18ba6398245d04d38a897811768db9dcc65fa4b0"
+        },
+        {
+          "path": "licenses/python-pygame/LGPL.txt",
+          "origin": "pygame-2.6.1.tar.gz/docs/LGPL.txt",
+          "sha256": "a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7"
+        },
+        {
+          "path": "licenses/python-pygame/LICENSE.sdl_gfx.txt",
+          "origin": "pygame-2.6.1.tar.gz/docs/licenses/LICENSE.sdl_gfx.txt",
+          "sha256": "63744690fa28ecf2a9dedacafb08d1209031e7eff1820430d952264f678a1bcf"
+        },
+        {
+          "path": "licenses/python-pygame/LICENSE.sse2neon-h.txt",
+          "origin": "pygame-2.6.1.tar.gz/docs/licenses/LICENSE.sse2neon-h.txt",
+          "sha256": "ada11c843d252c0b70837629ac7a54a525ecb7d8c0932ebccf863c55dbd32cb1"
+        }
+      ]
+    },
+    {
+      "id": "python-pyinstaller",
+      "name": "pyinstaller",
+      "version": "6.22.3",
+      "license": "GPLv2-or-later with a special exception which allows to use PyInstaller to build and distribute non-free programs (including commercial ones)",
+      "homepage": "https://pyinstaller.org/en/stable/license.html",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/python-pyinstaller/COPYING.txt",
+          "origin": "<project>/.venv/lib/python3.14/site-packages/pyinstaller-6.22.3.dist-info/licenses/COPYING.txt",
+          "sha256": "0598064c7d2718e38d7914a7d08343b2fa008e3bea9ebba2aa7a6ffa5900dd64"
+        },
+        {
+          "path": "licenses/python-pyinstaller/RUNTIME-HOOK-NOTICES.txt",
+          "origin": "PyInstaller 6.22.3 installed hooks/rthooks/",
+          "sha256": "698ef763cc8c9540705ef43229345b2ecf9e078e18891e1522cb77ad870c2adf"
+        },
+        {
+          "path": "licenses/python-pyinstaller/Apache-2.0.txt",
+          "origin": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ]
+    },
+    {
+      "id": "python-reportlab",
+      "name": "reportlab",
+      "version": "5.1.0",
+      "license": "BSD license (see license.txt for details), Copyright (c) 2000-2025, ReportLab Inc.",
+      "homepage": "https://pypi.org/project/reportlab/5.1.0/#files",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/python-reportlab/LICENSE",
+          "origin": "<project>/.venv/lib/python3.14/site-packages/reportlab-5.1.0.dist-info/licenses/LICENSE",
+          "sha256": "ef831761646313921375fc2cb888e8eeaf7da213d0b92852c10c42f3a0b4d138"
+        },
+        {
+          "path": "licenses/python-reportlab/license.txt",
+          "origin": "<project>/.venv/lib/python3.14/site-packages/reportlab/license.txt",
+          "sha256": "a02a6aeb5dde4c4194494bc0b10d5ed62a32628ccd2882c363fdb9a7874ab2b8"
+        }
+      ]
+    },
+    {
+      "id": "system-brotli",
+      "name": "brotli",
+      "version": "1.2.0-1.1",
+      "license": "MIT",
+      "homepage": "https://github.com/google/brotli",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-brotli/LICENSE",
+          "origin": "/usr/share/licenses/brotli/LICENSE",
+          "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94"
+        }
+      ]
+    },
+    {
+      "id": "system-bzip2",
+      "name": "bzip2",
+      "version": "1.0.8-6.1",
+      "license": "BSD",
+      "homepage": "https://sourceware.org/bzip2/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-bzip2/LICENSE",
+          "origin": "/usr/share/licenses/bzip2/LICENSE",
+          "sha256": "c6dbbf828498be844a89eaa3b84adbab3199e342eb5cb2ed2f0d4ba7ec0f38a3"
+        }
+      ]
+    },
+    {
+      "id": "system-expat",
+      "name": "expat",
+      "version": "2.9.0-1.1",
+      "license": "MIT",
+      "homepage": "https://libexpat.github.io/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-expat/COPYING",
+          "origin": "/usr/share/licenses/expat/COPYING",
+          "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87"
+        }
+      ]
+    },
+    {
+      "id": "system-fontconfig",
+      "name": "fontconfig",
+      "version": "2:2.18.3-2.1",
+      "license": "HPND AND Unicode-DFS-2016",
+      "homepage": "https://www.freedesktop.org/wiki/Software/fontconfig/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-fontconfig/COPYING",
+          "origin": "/usr/share/licenses/fontconfig/COPYING",
+          "sha256": "51a51aa9823704fd90bccc616cdd17ebabb5b2b3e9cbde886ca02c7002288067"
+        }
+      ]
+    },
+    {
+      "id": "system-freetype2",
+      "name": "freetype2",
+      "version": "2.15.0-1.1",
+      "license": "FTL (permitted alternative to GPL)",
+      "homepage": "https://gitlab.freedesktop.org/freetype/freetype/-/blob/master/docs/FTL.TXT",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-freetype2/FTL.TXT",
+          "origin": "/usr/share/licenses/freetype2/FTL.TXT",
+          "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f"
+        },
+        {
+          "path": "licenses/system-freetype2/COPYRIGHT-NOTICE.txt",
+          "origin": "/usr/include/freetype2/freetype/freetype.h",
+          "sha256": "5b9b048368303bfecd1cf785f2b59b797cd342ea8e150fef39b15c08445ef205"
+        }
+      ]
+    },
+    {
+      "id": "system-libffi",
+      "name": "libffi",
+      "version": "3.8.0-1.1",
+      "license": "MIT",
+      "homepage": "https://sourceware.org/libffi/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libffi/LICENSE",
+          "origin": "/usr/share/licenses/libffi/LICENSE",
+          "sha256": "17b64dc60f3b6897a60f971e288b973f655c2edcdf08b25f3c3dd5549857881c"
+        }
+      ]
+    },
+    {
+      "id": "system-libgcc",
+      "name": "libgcc",
+      "version": "16.2.1+r23+gd564253eb6c8-1",
+      "license": "GPL-3.0-or-later WITH GCC Runtime Library Exception 3.1",
+      "homepage": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/license.html",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libgcc/RUNTIME.LIBRARY.EXCEPTION",
+          "origin": "/usr/share/licenses/libgcc/RUNTIME.LIBRARY.EXCEPTION",
+          "sha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74"
+        },
+        {
+          "path": "licenses/system-libgcc/COPYING3",
+          "origin": "https://raw.githubusercontent.com/gcc-mirror/gcc/d564253eb6c8/COPYING3",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+        },
+        {
+          "path": "licenses/system-libgcc/COPYING.RUNTIME",
+          "origin": "https://raw.githubusercontent.com/gcc-mirror/gcc/d564253eb6c8/COPYING.RUNTIME",
+          "sha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74"
+        }
+      ]
+    },
+    {
+      "id": "system-libpng",
+      "name": "libpng",
+      "version": "1.6.59-1.1",
+      "license": "libpng-2.0",
+      "homepage": "http://www.libpng.org/pub/png/libpng.html",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libpng/LICENSE",
+          "origin": "/usr/share/licenses/libpng/LICENSE",
+          "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526"
+        }
+      ]
+    },
+    {
+      "id": "system-libstdc++",
+      "name": "libstdc++",
+      "version": "16.2.1+r23+gd564253eb6c8-1",
+      "license": "GPL-3.0-or-later WITH GCC Runtime Library Exception 3.1",
+      "homepage": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/license.html",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libstdc++/RUNTIME.LIBRARY.EXCEPTION",
+          "origin": "/usr/share/licenses/libstdc++/RUNTIME.LIBRARY.EXCEPTION",
+          "sha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74"
+        },
+        {
+          "path": "licenses/system-libstdc++/COPYING3",
+          "origin": "https://raw.githubusercontent.com/gcc-mirror/gcc/d564253eb6c8/COPYING3",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+        },
+        {
+          "path": "licenses/system-libstdc++/COPYING.RUNTIME",
+          "origin": "https://raw.githubusercontent.com/gcc-mirror/gcc/d564253eb6c8/COPYING.RUNTIME",
+          "sha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74"
+        }
+      ]
+    },
+    {
+      "id": "system-libx11",
+      "name": "libx11",
+      "version": "1.8.14-1.1",
+      "license": "MIT AND X11",
+      "homepage": "https://gitlab.freedesktop.org/xorg/lib/libx11",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libx11/COPYING",
+          "origin": "/usr/share/licenses/libx11/COPYING",
+          "sha256": "eda0c2ed1cae0280c7fe79762eaad8ad31c044afc64e71e92ef2c6f3cd7bc395"
+        }
+      ]
+    },
+    {
+      "id": "system-libxau",
+      "name": "libxau",
+      "version": "1.0.12-1.1",
+      "license": "MIT-open-group",
+      "homepage": "https://xorg.freedesktop.org/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libxau/COPYING",
+          "origin": "/usr/share/licenses/libxau/COPYING",
+          "sha256": "56abe29bb1d9806a9e04fa9f80fed2c0f18027594df3f098148d814aef6bddfa"
+        }
+      ]
+    },
+    {
+      "id": "system-libxdmcp",
+      "name": "libxdmcp",
+      "version": "1.1.5-2.1",
+      "license": "MIT-open-group",
+      "homepage": "https://gitlab.freedesktop.org/xorg/lib/libxdmcp",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libxdmcp/COPYING",
+          "origin": "/usr/share/licenses/libxdmcp/COPYING",
+          "sha256": "8a3c3f35b0dbcb60a4e242b9e4394a352a65bb27deb2938ea1e2e62a626e16e9"
+        }
+      ]
+    },
+    {
+      "id": "system-libxext",
+      "name": "libxext",
+      "version": "1.3.7-1.1",
+      "license": "LicenseRef-libxext",
+      "homepage": "https://gitlab.freedesktop.org/xorg/lib/libxext",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libxext/COPYING",
+          "origin": "/usr/share/licenses/libxext/COPYING",
+          "sha256": "fd62910be4b13829d94e76c1447cf840953f0e225c4dc6c79349c84dd0557f22"
+        }
+      ]
+    },
+    {
+      "id": "system-libxft",
+      "name": "libxft",
+      "version": "2.3.9-1.2",
+      "license": "HPND-sell-variant",
+      "homepage": "https://xorg.freedesktop.org/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libxft/COPYING",
+          "origin": "/usr/share/licenses/libxft/COPYING",
+          "sha256": "7cda22286b1379b9b73df695f72cbad36595e65b039a5fbc5c89b69ecc44438c"
+        }
+      ]
+    },
+    {
+      "id": "system-libxrender",
+      "name": "libxrender",
+      "version": "0.9.13-1.1",
+      "license": "HPND-sell-variant",
+      "homepage": "https://xorg.freedesktop.org/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libxrender/COPYING",
+          "origin": "/usr/share/licenses/libxrender/COPYING",
+          "sha256": "bbe1db89c48816c48248796adac91defd8fbde1141b145f01511781ab87f29a1"
+        }
+      ]
+    },
+    {
+      "id": "system-libxss",
+      "name": "libxss",
+      "version": "1.2.5-1.1",
+      "license": "X11",
+      "homepage": "https://gitlab.freedesktop.org/xorg/lib/libxscrnsaver",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-libxss/COPYING",
+          "origin": "/usr/share/licenses/libxss/COPYING",
+          "sha256": "5cf3e16f5dd753a4c0853e8227134ab65f5562d9ef89b1a2d7681f5c8ac9feb5"
+        }
+      ]
+    },
+    {
+      "id": "system-mpdecimal",
+      "name": "mpdecimal",
+      "version": "4.0.1-3.1",
+      "license": "BSD-2-Clause",
+      "homepage": "https://www.bytereef.org/mpdecimal/index.html",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-mpdecimal/COPYRIGHT.txt",
+          "origin": "/usr/share/licenses/mpdecimal/COPYRIGHT.txt",
+          "sha256": "dba079e24a0286052f9f36a5e0b4f6cc95bc83ada657eb26bef8c0b6473f6512"
+        }
+      ]
+    },
+    {
+      "id": "system-openssl",
+      "name": "openssl",
+      "version": "3.6.5-1.1",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/openssl/openssl/blob/openssl-3.6.5/LICENSE.txt",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-openssl/LICENSE.txt",
+          "origin": "/usr/share/licenses/openssl/LICENSE.txt",
+          "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+        },
+        {
+          "path": "licenses/system-openssl/AUTHORS.md",
+          "origin": "https://raw.githubusercontent.com/openssl/openssl/openssl-3.6.5/AUTHORS.md",
+          "sha256": "b9f638dfc06b59c2d3b808186c3b30f713805a5db390f5b77b1703ac58acb83e"
+        },
+        {
+          "path": "licenses/system-openssl/ACKNOWLEDGEMENTS.md",
+          "origin": "https://raw.githubusercontent.com/openssl/openssl/openssl-3.6.5/ACKNOWLEDGEMENTS.md",
+          "sha256": "58dee45791f007ced048114717f86672778fe75c551827c57e760861446ce3c3"
+        }
+      ]
+    },
+    {
+      "id": "system-python",
+      "name": "python",
+      "version": "3.14.8-1",
+      "license": "PSF-2.0",
+      "homepage": "https://www.python.org/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-python/LICENSE.txt",
+          "origin": "/usr/lib/python3.14/LICENSE.txt",
+          "sha256": "b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231"
+        }
+      ]
+    },
+    {
+      "id": "system-sdl2-compat",
+      "name": "sdl2-compat",
+      "version": "2.32.74-1.1",
+      "license": "Zlib",
+      "homepage": "https://github.com/libsdl-org/sdl2-compat",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-sdl2-compat/LICENSE.txt",
+          "origin": "/usr/share/licenses/sdl2-compat/LICENSE.txt",
+          "sha256": "0164aec3168ca9606c1f6066e879b4e8c7f2e46a838391f284348ab0aa1eabf2"
+        }
+      ]
+    },
+    {
+      "id": "system-sdl2_mixer",
+      "name": "sdl2_mixer",
+      "version": "2.8.2-1.1",
+      "license": "Zlib (actual upstream and installed notice; package metadata says MIT)",
+      "homepage": "https://github.com/libsdl-org/SDL_mixer/blob/release-2.8.2/LICENSE.txt",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-sdl2_mixer/LICENSE",
+          "origin": "/usr/share/licenses/sdl2_mixer/LICENSE",
+          "sha256": "7826eca0a0f7e591f38dd844e207a200aac81a59b20d8a30c3af8c6282af13e6"
+        }
+      ]
+    },
+    {
+      "id": "system-sqlite",
+      "name": "sqlite",
+      "version": "3.54.0-1",
+      "license": "Public-domain dedication (SQLite)",
+      "homepage": "https://www.sqlite.org/copyright.html",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-sqlite/license.txt",
+          "origin": "/usr/share/licenses/sqlite/license.txt",
+          "sha256": "4e57d9ac979f1c9872e69799c2597eeef4c6ce7224f3ede0bf9dc8d217b1e65d"
+        }
+      ]
+    },
+    {
+      "id": "system-tcl",
+      "name": "tcl",
+      "version": "8.6.16-1.1",
+      "license": "TCL",
+      "homepage": "http://tcl.sourceforge.net/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-tcl/license.terms",
+          "origin": "/usr/share/licenses/tcl/license.terms",
+          "sha256": "c0a69a2bfd757361ec7e6143973b103c90409316b49e9c88db26ad6388e79f16"
+        }
+      ]
+    },
+    {
+      "id": "system-tk",
+      "name": "tk",
+      "version": "8.6.16-1.1",
+      "license": "TCL",
+      "homepage": "http://tcl.sourceforge.net/",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-tk/license.terms",
+          "origin": "/usr/share/licenses/tk/license.terms",
+          "sha256": "2cde822b93ca16ae535c954b7dfe658b4ad10df2a193628d1b358f1765e8b198"
+        }
+      ]
+    },
+    {
+      "id": "system-util-linux-libs",
+      "name": "util-linux-libs",
+      "version": "2.42.4-1.1",
+      "license": "libuuid: BSD-3-Clause; not every util-linux package license applies",
+      "homepage": "https://github.com/util-linux/util-linux/blob/master/libuuid/COPYING",
+      "note": "Only libuuid is shipped from util-linux. Its BSD-3-Clause terms are selected; GPL utilities from that source package are not included.",
+      "files": [
+        {
+          "path": "licenses/system-util-linux-libs/COPYING.BSD-3-Clause",
+          "origin": "/usr/share/licenses/util-linux-libs/COPYING.BSD-3-Clause",
+          "sha256": "9b718a9460fed5952466421235bc79eb49d4e9eacc920d7a9dd6285ab8fd6c6d"
+        },
+        {
+          "path": "licenses/system-util-linux-libs/SOURCE-NOTICES.txt",
+          "origin": "https://api.github.com/repos/util-linux/util-linux/contents/libuuid/src?ref=v2.42.4",
+          "sha256": "67b3ce92d48fc2197654b9ae94acdb6fcf04a033386b2ea217c87c1edcbb2a75"
+        }
+      ]
+    },
+    {
+      "id": "system-xz",
+      "name": "xz",
+      "version": "5.8.3-1",
+      "license": "liblzma: 0BSD; not the entire XZ project license union",
+      "homepage": "https://github.com/tukaani-project/xz/blob/v5.8.3/COPYING",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-xz/COPYING",
+          "origin": "/usr/share/licenses/xz/COPYING",
+          "sha256": "616a3ad264ce29b8f1cb97e53037b139d406899ca8d1f799651e17bfa09830b8"
+        }
+      ]
+    },
+    {
+      "id": "system-zlib-ng-compat",
+      "name": "zlib-ng-compat",
+      "version": "2.3.3-2",
+      "license": "Zlib",
+      "homepage": "https://github.com/zlib-ng/zlib-ng",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-zlib-ng-compat/LICENSE.md",
+          "origin": "/usr/share/licenses/zlib-ng-compat/LICENSE.md",
+          "sha256": "6c9f0d975b41afaa34d22f55bb8986ce69e5cb7ad327cb2b28820cd425edf5ee"
+        }
+      ]
+    },
+    {
+      "id": "system-zstd",
+      "name": "zstd",
+      "version": "1.5.7-4",
+      "license": "BSD-3-Clause (selected alternative to GPL)",
+      "homepage": "https://github.com/facebook/zstd/blob/v1.5.7/LICENSE",
+      "note": "",
+      "files": [
+        {
+          "path": "licenses/system-zstd/LICENSE",
+          "origin": "/usr/share/licenses/zstd/LICENSE",
+          "sha256": "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8"
+        }
+      ]
+    }
+  ]
+}

@@ -1,38 +1,34 @@
 # -*- mode: python ; coding: utf-8 -*-
+from pathlib import Path
 
-
+project = Path(SPECPATH)
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    [str(project / 'main.py')],
+    pathex=[str(project)],
     binaries=[],
-    datas=[('assets/sounds/checkout.mp3', 'assets/sounds')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['readline'],
     noarchive=False,
     optimize=0,
 )
+# Checkout uses pygame.mixer and Tk fonts; its bundled default font is unused.
+a.datas = [entry for entry in a.datas if Path(entry[0]).name.casefold() != 'freesansbold.ttf']
 pyz = PYZ(a.pure)
-
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='POS-System',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
 )
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='POS-System')

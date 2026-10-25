@@ -1,7 +1,8 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
 
 from core import auth
+from ui.widgets import ActionButton, page_header, table
 
 
 class UsersFrame(ttk.Frame):
@@ -11,50 +12,73 @@ class UsersFrame(ttk.Frame):
         self.refresh()
 
     def _build_ui(self) -> None:
-        header = ttk.Frame(self)
-        header.pack(fill=tk.X)
-        ttk.Label(header, text="User Management", font=("Segoe UI", 18, "bold")).pack(anchor="w")
-        ttk.Label(header, text="Create and view user accounts.").pack(anchor="w", pady=(4, 8))
-
+        self.configure(padding=0)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(2, weight=1)
+        page_header(
+            self,
+            "Team members",
+            "Create staff accounts and assign administrator access.",
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 16))
         form = ttk.Frame(self)
-        form.pack(fill=tk.X, pady=(8, 8))
-        self.username_var = tk.StringVar()
-        self.password_var = tk.StringVar()
+        form.grid(row=1, column=0, sticky="nw", pady=(0, 20))
+        self.username_var, self.password_var = tk.StringVar(), tk.StringVar()
         self.is_admin_var = tk.BooleanVar(value=False)
-
-        ttk.Label(form, text="Username:").grid(row=0, column=0, sticky="w")
-        ttk.Entry(form, textvariable=self.username_var).grid(row=0, column=1, sticky="ew")
-        ttk.Label(form, text="Password:").grid(row=1, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(form, textvariable=self.password_var, show="*").grid(row=1, column=1, sticky="ew", pady=(6, 0))
-        ttk.Checkbutton(form, text="Admin", variable=self.is_admin_var).grid(row=2, column=1, sticky="w", pady=(6, 0))
-        form.columnconfigure(1, weight=1)
-
-        ttk.Button(form, text="Create User", command=self._create_user).grid(row=3, column=1, sticky="e", pady=(8, 0))
-
-        self.table = ttk.Treeview(self, columns=("username", "admin", "created"), show="headings", height=8)
-        self.table.heading("username", text="Username")
-        self.table.heading("admin", text="Admin")
-        self.table.heading("created", text="Created At")
-        self.table.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        ttk.Label(form, text="Username").grid(row=0, column=0, sticky="w", padx=(0, 16))
+        ttk.Entry(form, textvariable=self.username_var, width=34).grid(
+            row=0, column=1, sticky="ew"
+        )
+        ttk.Label(form, text="Password").grid(
+            row=1, column=0, sticky="w", padx=(0, 16), pady=(8, 0)
+        )
+        ttk.Entry(form, textvariable=self.password_var, show="•", width=34).grid(
+            row=1, column=1, sticky="ew", pady=(8, 0)
+        )
+        ttk.Checkbutton(
+            form, text="Administrator access", variable=self.is_admin_var
+        ).grid(row=2, column=1, sticky="w", pady=(6, 0))
+        self.feedback_var = tk.StringVar()
+        ttk.Label(
+            form, textvariable=self.feedback_var, style="Muted.TLabel", wraplength=500
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        ActionButton(
+            form, text="Create account", variant="Primary", command=self._create_user
+        ).grid(row=4, column=1, sticky="e", pady=(8, 0))
+        box, self.table = table(
+            self,
+            ("username", "admin", "created"),
+            ("Username", "Administrator", "Created"),
+            (240, 160, 200),
+            empty_text="No team members to display.",
+        )
+        box.grid(row=2, column=0, sticky="nsew")
 
     def refresh(self) -> None:
         for r in self.table.get_children():
             self.table.delete(r)
         for u in auth.get_users():
-            self.table.insert("", tk.END, values=(u["username"], "Yes" if u["is_admin"] else "No", u["created_at"]))
+            self.table.insert(
+                "",
+                tk.END,
+                values=(
+                    u["username"],
+                    "Yes" if u["is_admin"] else "No",
+                    u["created_at"],
+                ),
+            )
 
     def _create_user(self) -> None:
         username = self.username_var.get().strip()
-        password = self.password_var.get().strip()
-        is_admin = self.is_admin_var.get()
+        password = self.password_var.get()
         if not username or not password:
-            messagebox.showerror("Invalid input", "Username and password required", parent=self)
-            return
-        if auth.add_user(username, password, is_admin):
+            self.feedback_var.set("Enter a username and password.")
+        elif error := auth.password_error(password):
+            self.feedback_var.set(error)
+        elif auth.add_user(username, password, self.is_admin_var.get()):
             self.username_var.set("")
             self.password_var.set("")
             self.is_admin_var.set(False)
-            messagebox.showinfo("User created", f"User '{username}' created", parent=self)
+            self.feedback_var.set(f"Account created for {username}.")
             self.refresh()
         else:
-            messagebox.showerror("Create failed", "User could not be created (duplicate?)", parent=self)
+            self.feedback_var.set("Could not create the account. Try another username.")
