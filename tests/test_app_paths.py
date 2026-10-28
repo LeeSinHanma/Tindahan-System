@@ -70,6 +70,16 @@ class AppPathTests(unittest.TestCase):
             self.assertEqual(app_paths.database_path(), self.directory / "pos.db")
             self.assertIsNone(app_paths.legacy_database_path())
 
+    def test_selected_database_file_overrides_directory_for_source_and_installed_apps(self):
+        selected = self.directory / "My Store/custom-name.sqlite3"
+        os.environ["TINDAHAN_DB_FILE"] = str(selected)
+        os.environ["TINDAHAN_DATA_DIR"] = str(self.directory / "sounds-data")
+        for frozen in (False, True):
+            with self.subTest(frozen=frozen), patch.object(sys, "frozen", frozen, create=True):
+                self.assertEqual(app_paths.database_path(), selected)
+                self.assertIsNone(app_paths.legacy_database_path())
+                self.assertEqual(app_paths.user_data_directory(), self.directory / "sounds-data")
+
     def test_legacy_path_uses_executable_directory(self):
         with (
             patch.object(sys, "frozen", True, create=True),

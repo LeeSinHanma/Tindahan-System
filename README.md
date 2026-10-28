@@ -52,16 +52,32 @@ command after installing the system packages. Run the installer without `sudo`.
 After installation, open **Tindahan System** from the application menu; no terminal
 commands or virtual-environment activation are needed to launch it.
 
+The installer first asks you to **Choose existing database…** or **Create a new
+store…**. Choose an existing `.db`, `.sqlite`, or `.sqlite3` file to keep its records
+and accounts, or choose a new filename to create a store and then set up the owner
+account. On updates, **Keep current database** continues using the saved selection.
+You can also choose another store; the previous database is left intact.
+
 This installation copies the source and creates a private Python environment in
 `~/.local/opt/tindahan-system-source/`. The downloaded project folder can be removed
-afterward. It uses the system Python and Tk packages, so keep those installed.
+afterward, provided your selected database is outside that folder. It uses the
+system Python and Tk packages, so keep those installed.
 Unlike the bundled `.run` installer, it downloads its Python dependencies during
 installation. Close the app and rerun the command from an updated checkout to update.
 
-Records are stored in `${XDG_DATA_HOME:-~/.local/share}/tindahan-system/pos.db`.
-An existing project `pos.db` is copied on installation only when that destination
-does not already exist; the original database is kept. Close any running copy
-before installing. A fresh installation asks you to create the owner account.
+The app opens the selected database file directly; it does not import a separate
+copy. Close any running copy before selecting or switching databases. To switch
+after installation, rerun `python3 scripts/install_linux.py` from the checkout.
+Existing installations default to `${XDG_DATA_HOME:-~/.local/share}/tindahan-system/pos.db`.
+Selected sounds stay in the user-data folder. Uninstall keeps the selected database.
+
+For installation without a graphical prompt, specify the file explicitly:
+
+```bash
+python3 scripts/install_linux.py --database "/path/to/existing-store.sqlite3"
+# Or create a store at a filename that does not exist yet:
+python3 scripts/install_linux.py --new-database "$HOME/Documents/my-store.db"
+```
 
 To uninstall this source installation while keeping store records and sounds:
 
@@ -111,7 +127,10 @@ outside the application directory:
 | Installed Linux | `${XDG_DATA_HOME:-~/.local/share}/tindahan-system/pos.db` |
 
 `TINDAHAN_DATA_DIR` can explicitly select another data directory for either run
-mode. An installed app automatically copies an existing `pos.db` beside its
+mode. `TINDAHAN_DB_FILE` selects an exact database filename and takes precedence
+over that directory for database storage. The source desktop installer sets both
+in its launcher, using the database selected during installation.
+An installed app automatically copies an existing `pos.db` beside its
 executable into its user-data directory on first launch, including committed
 SQLite WAL data. The old database remains intact; an existing destination is
 never replaced. When moving from a source checkout, close the source app and
@@ -264,7 +283,7 @@ Transfers are recorded manually from details verified in your wallet or bank app
 
 Use **Record transfer** and choose **Cash-In** or **Cash-Out**. Both capture the
 transfer date/time, shop account, customer account, amount, service fee, and last
-five reference digits. Account labels change with the direction:
+five reference characters (letters A–Z or digits 0–9). Account labels change with the direction:
 
 - **Cash-Out:** your shop account receives the transfer; the customer account
   sends it. Records start **Unclaimed**. Use **Confirm cash handed over** after
@@ -276,7 +295,10 @@ five reference digits. Account labels change with the direction:
 Completed transfers and claimed cash-outs cannot be completed again. Existing
 cash-out records keep their original details and are automatically labeled Cash-Out.
 
-Search one to five reference digits, including a partial ending such as `7890`.
+Search one to five reference characters, including a partial ending such as `7890`
+or `AB12`. Letter case is preserved when saved; searches and duplicate checks
+ignore letter case. Existing numeric references and transfer records are kept
+when upgrading.
 Searches include all dates and both services unless you choose a service, status,
 or shop-account filter. The service column distinguishes the direction.
 

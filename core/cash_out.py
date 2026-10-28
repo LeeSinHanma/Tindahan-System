@@ -171,7 +171,7 @@ def _duplicates(conn, account_id, timestamp, amount_cents, reference, transactio
         for row in conn.execute(
             "SELECT * FROM cash_out_transactions WHERE receiving_account_id=? AND transaction_type=? "
             "AND transferred_at >= ? AND transferred_at < ? "
-            "AND amount_cents=? AND reference_last5=? ORDER BY id DESC",
+            "AND amount_cents=? AND reference_last5=? COLLATE NOCASE ORDER BY id DESC",
             (
                 account_id,
                 transaction_type,
@@ -201,9 +201,9 @@ def create_transaction(
     reference = str(reference_last5).strip()
     if not sender:
         raise ValueError("Enter the customer's account details shown on the transfer.")
-    if re.fullmatch(r"[0-9]{5}", reference) is None:
+    if re.fullmatch(r"[0-9A-Za-z]{5}", reference) is None:
         raise ValueError(
-            "Enter exactly the last five reference digits, including leading zeros."
+            "Enter exactly the last five reference characters using letters A–Z or digits 0–9."
         )
     amount_cents = money_to_cents(amount)
     override = (
@@ -264,8 +264,8 @@ def list_transactions(
 ):
     _validate_type(transaction_type, allow_all=True)
     reference = str(reference).strip()
-    if reference and re.fullmatch(r"[0-9]{1,5}", reference) is None:
-        raise ValueError("Search using one to five reference digits.")
+    if reference and re.fullmatch(r"[0-9A-Za-z]{1,5}", reference) is None:
+        raise ValueError("Search using one to five reference characters: letters A–Z or digits 0–9.")
     if status not in ("all", "unclaimed", "claimed"):
         raise ValueError("Choose a valid claim status.")
     clauses, params = [], []

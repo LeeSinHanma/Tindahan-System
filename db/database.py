@@ -1,5 +1,6 @@
 import json
 import math
+import re
 import sqlite3
 
 from core.app_paths import database_path, legacy_database_path, prepare_database
@@ -42,6 +43,51 @@ def _stock_tracked_column_exists(conn: sqlite3.Connection) -> bool:
 
 def _parent_product_column_exists(conn: sqlite3.Connection) -> bool:
     return "parent_product_id" in _table_columns(conn, "products")
+
+
+def _allow_reference_letters(conn) -> None:
+    """Replace the old digits-only CHECK without changing existing ledger records."""
+    table = "cash_out_transactions"
+    schema = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone()[0]
+    numeric_check = r"reference_last5\s+NOT\s+GLOB\s+'\*\[\^0-9\]\*'"
+    schema, replacements = re.subn(
+        numeric_check, "reference_last5 NOT GLOB '*[^0-9A-Za-z]*'", schema,
+        flags=re.IGNORECASE,
+    )
+    if not replacements:
+        return
+    replacement = "cash_out_transactions_alphanumeric"
+    objects = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE tbl_name=? "
+        "AND type IN ('index', 'trigger') AND sql IS NOT NULL", (table,)
+    ).fetchall()
+    sequence = conn.execute(
+        "SELECT seq FROM sqlite_sequence WHERE name=?", (table,)
+    ).fetchone()
+    columns = ", ".join(
+        '"' + row[1].replace('"', '""') + '"'
+        for row in conn.execute(f"PRAGMA table_info({table})")
+    )
+    # Explicitly include DDL in a transaction; roll back the whole rebuild on failure.
+    conn.execute("SAVEPOINT cash_out_reference_migration")
+    try:
+        conn.execute(schema.replace(table, replacement, 1))
+        conn.execute(f"INSERT INTO {replacement} ({columns}) SELECT {columns} FROM {table}")
+        conn.execute(f"DROP TABLE {table}")
+        conn.execute(f"ALTER TABLE {replacement} RENAME TO {table}")
+        for row in objects:
+            conn.execute(row[0])
+        if sequence is not None:
+            conn.execute(
+                "UPDATE sqlite_sequence SET seq=MAX(seq, ?) WHERE name=?", (sequence[0], table)
+            )
+        conn.execute("RELEASE cash_out_reference_migration")
+    except Exception:
+        conn.execute("ROLLBACK TO cash_out_reference_migration")
+        conn.execute("RELEASE cash_out_reference_migration")
+        raise
 
 
 def init_database() -> None:
@@ -238,7 +284,7 @@ def init_database() -> None:
                 suggested_fee_cents INTEGER NOT NULL CHECK (suggested_fee_cents >= 0),
                 reference_last5 TEXT NOT NULL CHECK (
                     length(reference_last5) = 5 AND
-                    reference_last5 NOT GLOB '*[^0-9]*'
+                    reference_last5 NOT GLOB '*[^0-9A-Za-z]*'
                 ),
                 status TEXT NOT NULL DEFAULT 'unclaimed'
                     CHECK (status IN ('unclaimed', 'claimed')),
@@ -258,6 +304,7 @@ def init_database() -> None:
             conn, "cash_out_transactions", "transaction_type",
             "TEXT NOT NULL DEFAULT 'cash_out' CHECK (transaction_type IN ('cash_out', 'cash_in'))",
         )
+        _allow_reference_letters(conn)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS cash_service_duplicate_lookup "
             "ON cash_out_transactions (transaction_type, receiving_account_id, "

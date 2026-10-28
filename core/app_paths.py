@@ -11,6 +11,9 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 
 
 def database_path() -> Path:
+    selected_file = os.environ.get("TINDAHAN_DB_FILE")
+    if selected_file:
+        return Path(selected_file).expanduser().resolve()
     override = os.environ.get("TINDAHAN_DATA_DIR")
     if override:
         return Path(override).expanduser().resolve() / "pos.db"
@@ -34,9 +37,30 @@ def user_data_directory() -> Path:
 
 
 def legacy_database_path() -> Path | None:
-    if getattr(sys, "frozen", False) and not os.environ.get("TINDAHAN_DATA_DIR"):
+    if (
+        getattr(sys, "frozen", False)
+        and not os.environ.get("TINDAHAN_DATA_DIR")
+        and not os.environ.get("TINDAHAN_DB_FILE")
+    ):
         return Path(sys.executable).resolve().parent / "pos.db"
     return None
+
+
+def validate_store_database(path: Path) -> None:
+    """Check a selected store without creating or changing the original file."""
+    if not path.is_file():
+        raise ValueError("The selected database could not be found. Choose it again.")
+    try:
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+            if connection.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                raise ValueError("The selected database failed its integrity check.")
+            tables = {
+                row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
+            if not {"products", "sales", "users", "settings"}.issubset(tables):
+                raise ValueError("Choose a Tindahan System store database.")
+    except sqlite3.DatabaseError as exc:
+        raise ValueError("The selected file is not a readable Tindahan System database.") from exc
 
 
 def prepare_database(destination: Path, legacy: Path | None = None) -> None:

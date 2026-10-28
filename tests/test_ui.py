@@ -680,6 +680,27 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(cash_out.list_accounts()[0]["account_number"], "00001234567")
         self.assertEqual(len(frame.accounts_table.get_children()), 1)
 
+    def test_cash_in_out_forms_save_and_find_alphanumeric_references(self):
+        frame, _, modal = self.cash_out_form()
+        for service in ("Cash-Out", "Cash-In"):
+            with self.subTest(service=service):
+                if service == "Cash-In":
+                    frame._open_transfer("cash_in")
+                    modal = self.modal()
+                fields = frame.transfer_vars
+                fields["type"].set(service)
+                fields["sender"].set("Customer wallet")
+                fields["amount"].set("1500")
+                fields["reference"].set("00aB1")
+                self.assertIn("letters or digits", frame.transfer_labels["reference"].cget("text"))
+                self.button(modal, "Save transfer").invoke()
+                self.assertFalse(modal.winfo_exists())
+        frame.reference_var.set("Ab")
+        frame._load_transactions()
+        rows = frame.transactions_table.get_children()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({frame.transactions_table.set(row, "reference") for row in rows}, {"00aB1"})
+
     def test_cash_out_automatic_fee_custom_override_and_reset(self):
         frame, _, modal = self.cash_out_form()
         fields = frame.transfer_vars

@@ -126,7 +126,7 @@ class CashOutFrame(ttk.Frame):
         search.columnconfigure(0, weight=1)
         ttk.Label(
             search,
-            text="Search the last reference digits · includes all dates",
+            text="Search reference ending · letters or digits · includes all dates",
             style="Muted.TLabel",
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
         self.reference_entry = ttk.Entry(search, textvariable=self.reference_var)
@@ -701,7 +701,7 @@ class CashOutFrame(ttk.Frame):
                 ("sender", "Sending account"),
                 ("amount", "Cash-out amount (PHP)"),
                 ("fee", "Service fee (PHP)"),
-                ("reference", "Reference · last 5 digits"),
+                ("reference", "Reference · last 5 letters or digits"),
             ]
         ):
             self.transfer_labels[key] = ttk.Label(body, text=label)

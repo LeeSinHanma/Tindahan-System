@@ -166,11 +166,105 @@ class CashOutTests(unittest.TestCase):
         )
         self.assertEqual(len(cash_out.list_transactions(status="claimed")), 1)
         self.assertEqual(cash_out.list_transactions("99999"), [])
-        for reference in ("1234", "123456", "12abc", "１２３４５"):
+        for reference in ("1234", "123456", "12-ab", "１２３４５"):
             with self.assertRaises(ValueError):
                 self.record(reference_last5=reference)
         with self.assertRaises(ValueError):
             cash_out.list_transactions("7%")
+
+    def test_both_services_accept_letters_and_digits_and_search_without_case(self):
+        for service in cash_out.TRANSACTION_TYPES:
+            for reference in ("00aB1", "abcDE", "12345"):
+                with self.subTest(service=service, reference=reference):
+                    transaction_id = self.record(
+                        reference_last5=reference, transaction_type=service
+                    )
+                    self.assertEqual(
+                        cash_out.get_transaction(transaction_id)["reference_last5"], reference
+                    )
+                    matches = cash_out.list_transactions(
+                        reference.swapcase(), transaction_type=service
+                    )
+                    self.assertEqual([row["id"] for row in matches], [transaction_id])
+            matches = cash_out.list_transactions("aB", transaction_type=service)
+            self.assertEqual(len(matches), 2)
+
+    def test_alphanumeric_duplicate_checks_ignore_case_and_keep_service_separate(self):
+        for service in cash_out.TRANSACTION_TYPES:
+            first = self.record(reference_last5="00aB1", transaction_type=service)
+            cash_out.complete_transaction(first)
+            with self.assertRaises(cash_out.DuplicateTransactionError) as caught:
+                self.record(reference_last5="00Ab1", transaction_type=service)
+            self.assertEqual(caught.exception.matches[0]["id"], first)
+            self.record(reference_last5="00Ab1", transaction_type=service, allow_duplicate=True)
+
+    def test_reference_validation_keeps_five_ascii_letters_or_digits(self):
+        for reference in ("", "AB12", "ABC123", "AB-12", "AB_12", "AB%12", "A B12", "ABé12"):
+            with self.subTest(reference=reference), self.assertRaises(ValueError):
+                self.record(reference_last5=reference)
+        for reference in ("AB1234", "AB%", "AB_", "AB-", "é"):
+            with self.subTest(search=reference), self.assertRaises(ValueError):
+                cash_out.list_transactions(reference)
+
+    def test_numeric_only_database_upgrade_preserves_records_indexes_and_sequence(self):
+        # Recreate the exact numeric CHECK shipped before alphanumeric references.
+        with closing(database.get_connection()) as conn, conn:
+            schema = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE name='cash_out_transactions'"
+            ).fetchone()[0]
+            conn.execute("DROP TABLE cash_out_transactions")
+            conn.execute(schema.replace("[^0-9A-Za-z]", "[^0-9]"))
+            conn.execute(
+                "CREATE INDEX retained_reference_index ON cash_out_transactions(reference_last5)"
+            )
+            conn.execute("CREATE TABLE reference_audit (transaction_id INTEGER)")
+            conn.execute(
+                "CREATE TRIGGER retained_reference_audit AFTER INSERT ON cash_out_transactions "
+                "BEGIN INSERT INTO reference_audit VALUES (NEW.id); END"
+            )
+        first = self.record(fee="7.77")
+        cash_out.complete_transaction(first)
+        incoming = self.record(transaction_type="cash_in", reference_last5="00001", fee=0)
+        deleted = self.record(reference_last5="00002")
+        with closing(database.get_connection()) as conn, conn:
+            conn.execute("DELETE FROM cash_out_transactions WHERE id=?", (deleted,))
+        original = {row["id"]: row for row in cash_out.list_transactions()}
+        with self.assertRaises(database.sqlite3.IntegrityError):
+            self.record(reference_last5="00aB1")
+        with closing(database.get_connection()) as conn:
+            def deny_drop(action, table, *_):
+                if action == database.sqlite3.SQLITE_DROP_TABLE and table == "cash_out_transactions":
+                    return database.sqlite3.SQLITE_DENY
+                return database.sqlite3.SQLITE_OK
+
+            conn.set_authorizer(deny_drop)
+            with self.assertRaises(database.sqlite3.DatabaseError):
+                database._allow_reference_letters(conn)
+            conn.set_authorizer(None)
+            self.assertEqual(
+                {row["id"]: dict(row) for row in conn.execute("SELECT * FROM cash_out_transactions")},
+                original,
+            )
+            self.assertIsNone(conn.execute(
+                "SELECT name FROM sqlite_master WHERE name='cash_out_transactions_alphanumeric'"
+            ).fetchone())
+        database.init_database()
+        self.assertEqual({row["id"]: row for row in cash_out.list_transactions()}, original)
+        for service in cash_out.TRANSACTION_TYPES:
+            transaction_id = self.record(reference_last5="00aB1", transaction_type=service)
+            self.assertGreater(transaction_id, deleted)
+        database.init_database()
+        self.assertEqual(cash_out.get_transaction(first), original[first])
+        self.assertEqual(cash_out.get_transaction(incoming), original[incoming])
+        with closing(database.get_connection()) as conn:
+            indexes = {row["name"] for row in conn.execute("PRAGMA index_list(cash_out_transactions)")}
+            self.assertIn("retained_reference_index", indexes)
+            self.assertIn("cash_out_duplicate_lookup", indexes)
+            self.assertIn("cash_out_transfer_time_lookup", indexes)
+            self.assertIn("cash_service_duplicate_lookup", indexes)
+            self.assertEqual(conn.execute("PRAGMA foreign_key_check").fetchall(), [])
+            audit = {row[0] for row in conn.execute("SELECT transaction_id FROM reference_audit")}
+            self.assertIn(transaction_id, audit)
 
     def test_claim_is_persistent_and_cannot_be_repeated(self):
         transaction_id = self.record()
