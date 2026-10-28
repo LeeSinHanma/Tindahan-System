@@ -34,6 +34,41 @@ and its dependency-license review remain pending.
 Packaged apps include Python, Tk, audio playback, and PDF dependencies. You do
 not need to install Python or activate a virtual environment to use an installer.
 
+### Linux Mint / Ubuntu: install from a fresh clone
+
+If you downloaded the source code and have no `.run` installer, run these commands
+once to install the app and add **Tindahan System** to your application menu:
+
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-venv python3-tk
+git clone https://github.com/LeeSinHanma/Tindahan-System.git
+cd Tindahan-System
+python3 scripts/install_linux.py
+```
+
+If you already have the project folder, open a terminal there and run the last
+command after installing the system packages. Run the installer without `sudo`.
+After installation, open **Tindahan System** from the application menu; no terminal
+commands or virtual-environment activation are needed to launch it.
+
+This installation copies the source and creates a private Python environment in
+`~/.local/opt/tindahan-system-source/`. The downloaded project folder can be removed
+afterward. It uses the system Python and Tk packages, so keep those installed.
+Unlike the bundled `.run` installer, it downloads its Python dependencies during
+installation. Close the app and rerun the command from an updated checkout to update.
+
+Records are stored in `${XDG_DATA_HOME:-~/.local/share}/tindahan-system/pos.db`.
+An existing project `pos.db` is copied on installation only when that destination
+does not already exist; the original database is kept. Close any running copy
+before installing. A fresh installation asks you to create the owner account.
+
+To uninstall this source installation while keeping store records and sounds:
+
+```bash
+python3 ~/.local/opt/tindahan-system-source/scripts/install_linux.py --uninstall
+```
+
 ### Linux x86-64
 
 1. Open `Tindahan-System-<version>-linux-x86_64-setup.run`.
